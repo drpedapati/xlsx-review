@@ -39,8 +39,9 @@ Suite intent:
 Current sources:
 
 - `apache-poi`: `test-data/spreadsheet` from `apache/poi` (Apache-2.0)
-- `closedxml`: `ClosedXML.Tests/Resource/TryToLoad` from `ClosedXML/ClosedXML` (MIT)
+- `closedxml`: `ClosedXML.Tests/Resource` from `ClosedXML/ClosedXML` (MIT)
 - `openxml-sdk`: `test/DocumentFormat.OpenXml.Tests.Assets` from `dotnet/Open-XML-SDK` (MIT)
+- `exceljs`: `spec` from `exceljs/exceljs` (MIT)
 
 Notes:
 

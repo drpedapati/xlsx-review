@@ -61,8 +61,9 @@ copy_repo_files() {
 }
 
 copy_repo_files "apache-poi" "https://github.com/apache/poi" "test-data/spreadsheet" "Apache-2.0"
-copy_repo_files "closedxml" "https://github.com/ClosedXML/ClosedXML" "ClosedXML.Tests/Resource/TryToLoad" "MIT"
+copy_repo_files "closedxml" "https://github.com/ClosedXML/ClosedXML" "ClosedXML.Tests/Resource" "MIT"
 copy_repo_files "openxml-sdk" "https://github.com/dotnet/Open-XML-SDK" "test/DocumentFormat.OpenXml.Tests.Assets" "MIT"
+copy_repo_files "exceljs" "https://github.com/exceljs/exceljs" "spec" "MIT"
 
 file_count="$(tail -n +2 "${MANIFEST_PATH}" | wc -l | tr -d '[:space:]')"
 total_bytes="$(awk -F '\t' 'NR > 1 { sum += $7 } END { print sum + 0 }' "${MANIFEST_PATH}")"

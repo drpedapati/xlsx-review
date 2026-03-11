@@ -293,6 +293,8 @@ make install      # Build + install to /usr/local/bin
 make all          # Cross-compile for macOS ARM64, macOS x64, Linux x64, Linux ARM64
 make docker       # Build Docker image
 make smoke        # Run bundled read/diff/edit/create/advanced smoke tests
+make smoke-packaged  # Run smoke tests against the packaged single-file binary
+make release-check  # Run the production release validation gate
 make test         # Run test (requires TEST_DOC=path/to/spreadsheet.xlsx)
 make test-create  # Run blank/template create smoke tests
 make test-advanced  # Run advanced workbook metadata smoke test
@@ -467,6 +469,31 @@ size, and SHA-256 for each spreadsheet. Validation reports are written under
 `make corpus-smoke` uses the published single-file binary. `make corpus-feature-smoke`
 and `make corpus-check` use the local Release runner for longer or more
 assertion-heavy sweeps.
+
+Current curated production baseline:
+
+- public corpus size: `858` workbooks
+- `make corpus-smoke`: `26/26` representative read checks passing
+- `make corpus-feature-smoke`: `24` workbooks / `36` assertions passing
+- full clean-corpus read sweep: `815/858` readable, with the remaining failures dominated by corrupt or hostile packages
+
+## Release Process
+
+Before tagging a release:
+
+```bash
+make release-check
+```
+
+`make release-check` runs the bundled smoke suite, a packaged-binary smoke pass,
+refreshes the public corpus, and then runs both the curated corpus read smoke
+suite and the corpus feature assertions. The GitHub release workflow runs the
+same gate before it builds and uploads tagged release artifacts, and each
+matrix-built release binary now gets its own packaged smoke pass before upload.
+
+If you publish through the external Homebrew tap, update the formula there after
+the GitHub release and rerun `brew audit --strict --online` plus `brew fetch`
+against the new tag before treating the release as complete.
 
 ## License
 

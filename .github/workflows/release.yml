@@ -9,7 +9,22 @@ permissions:
   contents: write
 
 jobs:
+  validate:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run release validation gate
+        run: make release-check
+
   build:
+    needs: validate
     strategy:
       matrix:
         include:
@@ -47,6 +62,9 @@ jobs:
 
       - name: Rename binary
         run: mv publish/xlsx-review publish/${{ matrix.artifact }}
+
+      - name: Smoke packaged artifact
+        run: ./scripts/run_binary_smoke.sh --binary publish/${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

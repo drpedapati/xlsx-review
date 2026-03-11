@@ -22,7 +22,7 @@
 #   make clean        # Remove build artifacts
 
 BINARY_NAME  := xlsx-review
-VERSION      := 1.1.0
+VERSION      := $(shell sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' XlsxReview.csproj | head -n 1)
 BUILD_DIR    := build
 INSTALL_DIR  := /usr/local/bin
 LIMIT        ?= 50
@@ -48,7 +48,7 @@ PUBLISH_FLAGS := -c Release \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 
-.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout test-data-validation test-conditional-format test-tables corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
+.PHONY: build build-release install all docker smoke smoke-packaged release-check test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout test-data-validation test-conditional-format test-tables corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
 
 ## build: Build single-file binary for current platform
 build:
@@ -116,6 +116,14 @@ smoke: build-release
 	@$(MAKE) --no-print-directory test-tables
 	@echo "✅ Smoke tests passed"
 	@ls -lh $(BUILD_DIR)/smoke-output.xlsx $(BUILD_DIR)/smoke-created.xlsx
+
+## smoke-packaged: Run read/edit/create/diff smoke tests against the packaged single-file binary
+smoke-packaged: build
+	@./scripts/run_binary_smoke.sh --binary ./$(BUILD_DIR)/$(BINARY_NAME) --work-dir $(BUILD_DIR)/packaged-smoke
+
+## release-check: Run the production release validation gate
+release-check: smoke smoke-packaged corpus-download corpus-smoke corpus-feature-smoke
+	@echo "✅ Release checks passed"
 
 ## test: Run test against a sample spreadsheet
 test: build-release
@@ -307,6 +315,8 @@ help:
 	@echo "  make install                      # Build + install to $(INSTALL_DIR)"
 	@echo "  make all                          # Cross-compile all platforms"
 	@echo "  make smoke                        # Run bundled example smoke tests"
+	@echo "  make smoke-packaged               # Run smoke tests against the packaged binary"
+	@echo "  make release-check                # Run the production release validation gate"
 	@echo "  make test-create                  # Exercise workbook creation mode"
 	@echo "  make test-advanced                # Exercise advanced workbook metadata edits"
 	@echo "  make test-worksheet-ux            # Exercise worksheet UX features"

@@ -11,6 +11,7 @@
 #   make test-create  # Run create-mode smoke test
 #   make test-advanced # Run advanced workbook feature smoke test
 #   make test-worksheet-ux # Run worksheet UX smoke test
+#   make test-hyperlinks # Run hyperlink smoke test
 #   make corpus-download  # Download public XLSX regression corpus
 #   make corpus-smoke     # Run a curated read smoke suite from the public corpus
 #   make corpus-check     # Run read checks across the public corpus
@@ -43,7 +44,7 @@ PUBLISH_FLAGS := -c Release \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 
-.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
+.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
 
 ## build: Build single-file binary for current platform
 build:
@@ -104,6 +105,7 @@ smoke: build-release
 	@$(LOCAL_RUNNER) $(BUILD_DIR)/smoke-created.xlsx --read --json > $(BUILD_DIR)/smoke-create-read.json
 	@$(MAKE) --no-print-directory test-advanced
 	@$(MAKE) --no-print-directory test-worksheet-ux
+	@$(MAKE) --no-print-directory test-hyperlinks
 	@echo "✅ Smoke tests passed"
 	@ls -lh $(BUILD_DIR)/smoke-output.xlsx $(BUILD_DIR)/smoke-created.xlsx
 
@@ -180,6 +182,21 @@ test-worksheet-ux: build-release
 	@ls -lh $(BUILD_DIR)/ux-output.xlsx $(BUILD_DIR)/ux-created.xlsx $(BUILD_DIR)/ux-reset.xlsx
 	@echo "✅ Worksheet UX tests passed"
 
+## test-hyperlinks: Exercise hyperlink edits and read-back assertions
+test-hyperlinks: build-release
+	@echo "Testing hyperlinks..."
+	@$(LOCAL_RUNNER) examples/test_old.xlsx examples/sample-hyperlink-edits.json -o $(BUILD_DIR)/hyperlink-output.xlsx --json > $(BUILD_DIR)/test-hyperlink.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-hyperlink.json
+	@echo "Testing hyperlink create..."
+	@$(LOCAL_RUNNER) --create --template examples/test_old.xlsx -o $(BUILD_DIR)/hyperlink-created.xlsx examples/sample-hyperlink-edits.json --json > $(BUILD_DIR)/test-hyperlink-create.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-hyperlink-create.json
+	@echo "Testing hyperlink cleanup..."
+	@$(LOCAL_RUNNER) $(BUILD_DIR)/hyperlink-output.xlsx examples/sample-hyperlink-cleanup.json -o $(BUILD_DIR)/hyperlink-reset.xlsx --json > $(BUILD_DIR)/test-hyperlink-reset.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-hyperlink-reset.json
+	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-hyperlink-smoke.tsv
+	@ls -lh $(BUILD_DIR)/hyperlink-output.xlsx $(BUILD_DIR)/hyperlink-created.xlsx $(BUILD_DIR)/hyperlink-reset.xlsx
+	@echo "✅ Hyperlink tests passed"
+
 ## corpus-download: Download the public XLSX regression corpus
 corpus-download:
 	@./scripts/download_public_corpus.sh
@@ -225,6 +242,7 @@ help:
 	@echo "  make test-create                  # Exercise workbook creation mode"
 	@echo "  make test-advanced                # Exercise advanced workbook metadata edits"
 	@echo "  make test-worksheet-ux            # Exercise worksheet UX features"
+	@echo "  make test-hyperlinks              # Exercise hyperlink features"
 	@echo "  make corpus-download              # Download public XLSX corpus"
 	@echo "  make corpus-smoke                 # Run the curated corpus smoke suite"
 	@echo "  make corpus-feature-smoke         # Assert workbook/sheet feature metadata"

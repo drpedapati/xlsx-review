@@ -1,0 +1,10 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "clear_hyperlink",
+      "sheet": "Data",
+      "cell": "A2"
+    }
+  ]
+}

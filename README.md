@@ -77,6 +77,9 @@ xlsx-review input.xlsx examples/sample-advanced-edits.json -o advanced.xlsx
 # Apply worksheet UX edits
 xlsx-review input.xlsx examples/sample-worksheet-ux-edits.json -o ux.xlsx
 
+# Add a hyperlink
+xlsx-review input.xlsx examples/sample-hyperlink-edits.json -o linked.xlsx
+
 # Read spreadsheet (human-readable)
 xlsx-review input.xlsx --read
 
@@ -140,6 +143,8 @@ that there is no input workbook when you pass `--create`.
 | `clear_freeze_panes` | `sheet` | Remove frozen pane state from a worksheet |
 | `set_auto_filter` | `sheet`, `range` | Apply an auto-filter range such as `A1:D6` |
 | `clear_auto_filter` | `sheet` | Remove worksheet auto-filter state |
+| `set_hyperlink` | `sheet`, `cell`, `url` | Add or replace an external hyperlink on a cell |
+| `clear_hyperlink` | `sheet`, `cell` | Remove a hyperlink from a cell |
 
 ## Create Mode
 
@@ -173,6 +178,7 @@ The current worksheet UX tranche covers:
 - merged cells
 - freeze panes
 - auto-filter state
+- hyperlinks
 
 See [docs/advanced-features-roadmap.md](/Users/ernie/Documents/irl_projects/xlsx-review/docs/advanced-features-roadmap.md) for the phased plan covering the rest of worksheet UX, tables, validations, conditional formats, richer formula handling, charts, pivots, and connected-workbook features.
 

@@ -94,6 +94,9 @@ public class Change
     [JsonPropertyName("comment")]
     public string? Comment { get; set; }
 
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
     [JsonPropertyName("enabled")]
     public bool? Enabled { get; set; }
 
@@ -389,6 +392,12 @@ public class SheetData
     [JsonPropertyName("auto_filter_range")]
     public string? AutoFilterRange { get; set; }
 
+    [JsonPropertyName("hyperlink_count")]
+    public int HyperlinkCount { get; set; }
+
+    [JsonPropertyName("hyperlinks")]
+    public List<HyperlinkInfo> Hyperlinks { get; set; } = new();
+
     [JsonPropertyName("tables")]
     public List<TableInfo> Tables { get; set; } = new();
 
@@ -463,6 +472,27 @@ public class ConditionalFormatInfo
 
     [JsonPropertyName("priorities")]
     public List<int> Priorities { get; set; } = new();
+}
+
+public class HyperlinkInfo
+{
+    [JsonPropertyName("cell")]
+    public string Cell { get; set; } = "";
+
+    [JsonPropertyName("target")]
+    public string? Target { get; set; }
+
+    [JsonPropertyName("location")]
+    public string? Location { get; set; }
+
+    [JsonPropertyName("display")]
+    public string? Display { get; set; }
+
+    [JsonPropertyName("tooltip")]
+    public string? Tooltip { get; set; }
+
+    [JsonPropertyName("external")]
+    public bool External { get; set; }
 }
 
 public class RowData

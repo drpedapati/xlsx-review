@@ -81,6 +81,8 @@ public class SpreadsheetEditor
             sheetData.MergedCellCount = sheetData.MergedRanges.Count;
             sheetData.FreezePaneCell = GetFreezePaneCell(sheetPart.WorksheetPart);
             sheetData.AutoFilterRange = GetAutoFilterRange(sheetPart.WorksheetPart);
+            sheetData.Hyperlinks = GetHyperlinks(sheetPart.WorksheetPart);
+            sheetData.HyperlinkCount = sheetData.Hyperlinks.Count;
             sheetData.Tables = GetTableInfos(sheetPart.WorksheetPart);
             sheetData.TableCount = sheetData.Tables.Count;
             sheetData.DataValidations = GetDataValidationInfos(sheetPart.WorksheetPart);
@@ -161,6 +163,8 @@ public class SpreadsheetEditor
                 MergedRanges = sheetData.MergedRanges,
                 FreezePaneCell = sheetData.FreezePaneCell,
                 AutoFilterRange = sheetData.AutoFilterRange,
+                HyperlinkCount = sheetData.HyperlinkCount,
+                Hyperlinks = sheetData.Hyperlinks,
                 Tables = sheetData.Tables,
                 DataValidations = sheetData.DataValidations,
                 ConditionalFormats = sheetData.ConditionalFormats,
@@ -454,6 +458,36 @@ public class SpreadsheetEditor
         return worksheetPart.Worksheet.GetFirstChild<AutoFilter>()?.Reference?.Value;
     }
 
+    private static List<HyperlinkInfo> GetHyperlinks(WorksheetPart worksheetPart)
+    {
+        return worksheetPart.Worksheet.GetFirstChild<Hyperlinks>()?
+            .Elements<Hyperlink>()
+            .Select(link =>
+            {
+                string? relationshipId = link.Id?.Value;
+                string? target = null;
+
+                if (!string.IsNullOrWhiteSpace(relationshipId))
+                {
+                    target = worksheetPart.HyperlinkRelationships
+                        .FirstOrDefault(rel => rel.Id == relationshipId)?
+                        .Uri?.ToString();
+                }
+
+                return new HyperlinkInfo
+                {
+                    Cell = link.Reference?.Value ?? "",
+                    Target = target,
+                    Location = link.Location?.Value,
+                    Display = link.Display?.Value,
+                    Tooltip = link.Tooltip?.Value,
+                    External = !string.IsNullOrWhiteSpace(relationshipId)
+                };
+            })
+            .Where(link => !string.IsNullOrEmpty(link.Cell))
+            .ToList() ?? new List<HyperlinkInfo>();
+    }
+
     internal static string GetSheetVisibility(Sheet sheet)
     {
         var state = sheet.State?.Value;
@@ -601,6 +635,8 @@ public class SpreadsheetEditor
             "clear_freeze_panes" => !string.IsNullOrEmpty(c.Sheet),
             "set_auto_filter" => !string.IsNullOrEmpty(c.Sheet) && !string.IsNullOrEmpty(c.Range),
             "clear_auto_filter" => !string.IsNullOrEmpty(c.Sheet),
+            "set_hyperlink" => !string.IsNullOrEmpty(c.Sheet) && !string.IsNullOrEmpty(c.Cell) && !string.IsNullOrEmpty(c.Url),
+            "clear_hyperlink" => !string.IsNullOrEmpty(c.Sheet) && !string.IsNullOrEmpty(c.Cell),
             _ => false
         };
 
@@ -636,6 +672,8 @@ public class SpreadsheetEditor
         "clear_freeze_panes" => $"Cleared freeze panes on {c.Sheet}",
         "set_auto_filter" => $"Set auto filter on {c.Sheet}!{c.Range}",
         "clear_auto_filter" => $"Cleared auto filter on {c.Sheet}",
+        "set_hyperlink" => $"Set hyperlink on {c.Sheet}!{c.Cell} → {c.Url}",
+        "clear_hyperlink" => $"Cleared hyperlink on {c.Sheet}!{c.Cell}",
         _ => $"Unknown change type: {c.Type}"
     };
 
@@ -703,6 +741,12 @@ public class SpreadsheetEditor
                 break;
             case "clear_auto_filter":
                 ClearAutoFilter(workbookPart, c.Sheet!);
+                break;
+            case "set_hyperlink":
+                SetHyperlink(workbookPart, c.Sheet!, c.Cell!, c.Url!, c.Value);
+                break;
+            case "clear_hyperlink":
+                ClearHyperlink(workbookPart, c.Sheet!, c.Cell!);
                 break;
             default:
                 throw new Exception($"Unknown change type: {c.Type}");
@@ -1185,6 +1229,70 @@ public class SpreadsheetEditor
         worksheet.GetFirstChild<AutoFilter>()?.Remove();
     }
 
+    private void SetHyperlink(WorkbookPart workbookPart, string sheetName, string cellRef, string url, string? displayValue)
+    {
+        var worksheetPart = GetWorksheetPart(workbookPart, sheetName);
+        var worksheet = worksheetPart.Worksheet;
+
+        if (displayValue != null)
+            SetCell(workbookPart, sheetName, cellRef, displayValue, format: null);
+
+        var hyperlinks = worksheet.GetFirstChild<Hyperlinks>();
+        if (hyperlinks == null)
+        {
+            hyperlinks = InsertWorksheetElementAfterPredecessors(
+                worksheet,
+                new Hyperlinks(),
+                typeof(ConditionalFormatting),
+                typeof(DataValidations),
+                typeof(CustomSheetViews),
+                typeof(MergeCells),
+                typeof(DataConsolidate),
+                typeof(SortState),
+                typeof(AutoFilter),
+                typeof(Scenarios),
+                typeof(ProtectedRanges),
+                typeof(SheetProtection),
+                typeof(SheetCalculationProperties),
+                typeof(DocumentFormat.OpenXml.Spreadsheet.SheetData));
+        }
+
+        var hyperlink = hyperlinks.Elements<Hyperlink>()
+            .FirstOrDefault(link => link.Reference?.Value == cellRef);
+
+        if (hyperlink == null)
+        {
+            hyperlink = new Hyperlink { Reference = cellRef };
+            hyperlinks.AppendChild(hyperlink);
+        }
+        else
+        {
+            DeleteHyperlinkRelationship(worksheetPart, hyperlink.Id?.Value);
+        }
+
+        var relationship = worksheetPart.AddHyperlinkRelationship(new Uri(url, UriKind.Absolute), true);
+        hyperlink.Id = relationship.Id;
+        hyperlink.Location = null;
+        hyperlink.Display = displayValue;
+    }
+
+    private void ClearHyperlink(WorkbookPart workbookPart, string sheetName, string cellRef)
+    {
+        var worksheetPart = GetWorksheetPart(workbookPart, sheetName);
+        var hyperlinks = worksheetPart.Worksheet.GetFirstChild<Hyperlinks>()
+            ?? throw new Exception($"Sheet '{sheetName}' has no hyperlinks");
+
+        var hyperlink = hyperlinks.Elements<Hyperlink>()
+            .FirstOrDefault(link => link.Reference?.Value == cellRef)
+            ?? throw new Exception($"Hyperlink '{sheetName}!{cellRef}' not found");
+
+        DeleteHyperlinkRelationship(worksheetPart, hyperlink.Id?.Value);
+        hyperlink.Remove();
+
+        if (!hyperlinks.Elements<Hyperlink>().Any())
+            hyperlinks.Remove();
+    }
+
     // ── Comments (Legacy Notes) ──
 
     private void ApplyComment(WorkbookPart workbookPart, CommentDef commentDef)
@@ -1452,6 +1560,17 @@ public class SpreadsheetEditor
             worksheet.PrependChild(sheetViews);
 
         return sheetViews;
+    }
+
+    private static void DeleteHyperlinkRelationship(WorksheetPart worksheetPart, string? relationshipId)
+    {
+        if (string.IsNullOrWhiteSpace(relationshipId))
+            return;
+
+        var relationship = worksheetPart.HyperlinkRelationships
+            .FirstOrDefault(existing => existing.Id == relationshipId);
+        if (relationship != null)
+            worksheetPart.DeleteReferenceRelationship(relationship);
     }
 
     private WorksheetPart GetWorksheetPart(WorkbookPart workbookPart, string sheetName)
@@ -1728,6 +1847,8 @@ internal class SheetData_Read
     public List<string> MergedRanges { get; set; } = new();
     public string? FreezePaneCell { get; set; }
     public string? AutoFilterRange { get; set; }
+    public int HyperlinkCount { get; set; }
+    public List<HyperlinkInfo> Hyperlinks { get; set; } = new();
     public List<TableInfo> Tables { get; set; } = new();
     public List<DataValidationInfo> DataValidations { get; set; } = new();
     public List<ConditionalFormatInfo> ConditionalFormats { get; set; } = new();

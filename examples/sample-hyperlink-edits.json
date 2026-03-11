@@ -1,0 +1,11 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "set_hyperlink",
+      "sheet": "Data",
+      "cell": "A2",
+      "url": "https://example.com/p001"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# path	field	expected
+hyperlink-output.xlsx	sheet:Data.hyperlink_count	=1
+hyperlink-output.xlsx	sheet:Data.hyperlinks.0.cell	=A2
+hyperlink-output.xlsx	sheet:Data.hyperlinks.0.target	=https://example.com/p001
+hyperlink-output.xlsx	sheet:Data.hyperlinks.0.external	=true
+hyperlink-created.xlsx	sheet:Data.hyperlink_count	=1
+hyperlink-created.xlsx	sheet:Data.hyperlinks.0.target	=https://example.com/p001
+hyperlink-reset.xlsx	sheet:Data.hyperlink_count	=0

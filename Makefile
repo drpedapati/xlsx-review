@@ -239,6 +239,12 @@ test-data-validation: build-release
 	@echo "Testing data validation cleanup..."
 	@$(LOCAL_RUNNER) $(BUILD_DIR)/validation-output.xlsx examples/sample-data-validation-cleanup.json -o $(BUILD_DIR)/validation-reset.xlsx --json > $(BUILD_DIR)/test-data-validation-reset.json
 	@grep -q '"success": true' $(BUILD_DIR)/test-data-validation-reset.json
+	@echo "Testing data validation diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/validation-output.xlsx --json > $(BUILD_DIR)/test-data-validation-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-data-validation-diff.json")); s = j.fetch("summary"); abort("validation summary") unless s["data_validation_changes"] == 2 && s["metadata_changes"] == 2; ranges = j.fetch("metadata_diff").fetch("data_validation_changes").map { |x| [x["range"], x["type"]] }.sort; abort("validation diff") unless ranges == [["C2:C6", "added"], ["D2:D6", "added"]]'
+	@echo "Testing data validation reset diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/validation-reset.xlsx --json > $(BUILD_DIR)/test-data-validation-reset-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-data-validation-reset-diff.json")); abort("validation reset should be identical") unless j.dig("summary", "identical") == true'
 	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-data-validation-smoke.tsv
 	@ls -lh $(BUILD_DIR)/validation-output.xlsx $(BUILD_DIR)/validation-created.xlsx $(BUILD_DIR)/validation-reset.xlsx
 	@echo "✅ Data validation tests passed"
@@ -254,6 +260,12 @@ test-conditional-format: build-release
 	@echo "Testing conditional formatting cleanup..."
 	@$(LOCAL_RUNNER) $(BUILD_DIR)/conditional-output.xlsx examples/sample-conditional-format-cleanup.json -o $(BUILD_DIR)/conditional-reset.xlsx --json > $(BUILD_DIR)/test-conditional-format-reset.json
 	@grep -q '"success": true' $(BUILD_DIR)/test-conditional-format-reset.json
+	@echo "Testing conditional formatting diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/conditional-output.xlsx --json > $(BUILD_DIR)/test-conditional-format-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-conditional-format-diff.json")); s = j.fetch("summary"); abort("conditional summary") unless s["conditional_format_changes"] == 2 && s["metadata_changes"] == 2; ranges = j.fetch("metadata_diff").fetch("conditional_format_changes").map { |x| [x["range"], x["type"]] }.sort; abort("conditional diff") unless ranges == [["C2:C6", "added"], ["D2:D6", "added"]]'
+	@echo "Testing conditional formatting reset diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/conditional-reset.xlsx --json > $(BUILD_DIR)/test-conditional-format-reset-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-conditional-format-reset-diff.json")); abort("conditional reset should be identical") unless j.dig("summary", "identical") == true'
 	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-conditional-format-smoke.tsv
 	@ls -lh $(BUILD_DIR)/conditional-output.xlsx $(BUILD_DIR)/conditional-created.xlsx $(BUILD_DIR)/conditional-reset.xlsx
 	@echo "✅ Conditional formatting tests passed"
@@ -269,6 +281,12 @@ test-tables: build-release
 	@echo "Testing table cleanup..."
 	@$(LOCAL_RUNNER) $(BUILD_DIR)/table-output.xlsx examples/sample-table-cleanup.json -o $(BUILD_DIR)/table-reset.xlsx --json > $(BUILD_DIR)/test-table-reset.json
 	@grep -q '"success": true' $(BUILD_DIR)/test-table-reset.json
+	@echo "Testing table diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/table-output.xlsx --json > $(BUILD_DIR)/test-table-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-table-diff.json")); s = j.fetch("summary"); abort("table summary") unless s["table_changes"] == 1 && s["metadata_changes"] == 1; change = j.fetch("metadata_diff").fetch("table_changes").fetch(0); abort("table diff") unless change["type"] == "added" && change["sheet"] == "Data" && change["name"] == "PatientScores"'
+	@echo "Testing table reset diff..."
+	@$(LOCAL_RUNNER) --diff examples/test_old.xlsx $(BUILD_DIR)/table-reset.xlsx --json > $(BUILD_DIR)/test-table-reset-diff.json
+	@ruby -rjson -e 'j = JSON.parse(File.read("$(BUILD_DIR)/test-table-reset-diff.json")); abort("table reset should be identical") unless j.dig("summary", "identical") == true'
 	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-table-smoke.tsv
 	@ls -lh $(BUILD_DIR)/table-output.xlsx $(BUILD_DIR)/table-created.xlsx $(BUILD_DIR)/table-reset.xlsx
 	@echo "✅ Table tests passed"

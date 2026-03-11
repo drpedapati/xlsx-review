@@ -76,6 +76,10 @@ public static class SpreadsheetDiffer
                     NewProtected = newSheet.Protected
                 });
             }
+
+            result.MetadataDiff.TableChanges.AddRange(DiffTables(sheetName, oldSheet.Tables, newSheet.Tables));
+            result.MetadataDiff.DataValidationChanges.AddRange(DiffDataValidations(sheetName, oldSheet.DataValidations, newSheet.DataValidations));
+            result.MetadataDiff.ConditionalFormatChanges.AddRange(DiffConditionalFormats(sheetName, oldSheet.ConditionalFormats, newSheet.ConditionalFormats));
         }
 
         result.MetadataDiff.DefinedNameChanges = DiffDefinedNames(oldDoc.DefinedNames, newDoc.DefinedNames);
@@ -91,8 +95,17 @@ public static class SpreadsheetDiffer
         int sheetVisibilityChanges = result.MetadataDiff.SheetVisibilityChanges.Count;
         int sheetProtectionChanges = result.MetadataDiff.SheetProtectionChanges.Count;
         int definedNameChanges = result.MetadataDiff.DefinedNameChanges.Count;
+        int tableChanges = result.MetadataDiff.TableChanges.Count;
+        int dataValidationChanges = result.MetadataDiff.DataValidationChanges.Count;
+        int conditionalFormatChanges = result.MetadataDiff.ConditionalFormatChanges.Count;
         int workbookProtectionChanges = result.MetadataDiff.WorkbookProtectionChange.Changed ? 1 : 0;
-        int metadataChanges = sheetVisibilityChanges + sheetProtectionChanges + definedNameChanges + workbookProtectionChanges;
+        int metadataChanges = sheetVisibilityChanges
+            + sheetProtectionChanges
+            + definedNameChanges
+            + tableChanges
+            + dataValidationChanges
+            + conditionalFormatChanges
+            + workbookProtectionChanges;
 
         result.Summary = new XlsxDiffSummary
         {
@@ -108,6 +121,9 @@ public static class SpreadsheetDiffer
             SheetVisibilityChanges = sheetVisibilityChanges,
             SheetProtectionChanges = sheetProtectionChanges,
             DefinedNameChanges = definedNameChanges,
+            TableChanges = tableChanges,
+            DataValidationChanges = dataValidationChanges,
+            ConditionalFormatChanges = conditionalFormatChanges,
             WorkbookProtectionChanges = workbookProtectionChanges,
             MetadataChanges = metadataChanges,
             Identical = result.SheetsDiff.Added.Count == 0
@@ -178,6 +194,186 @@ public static class SpreadsheetDiffer
                         NewValue = null
                     });
                 }
+            }
+        }
+
+        return changes;
+    }
+
+    private static List<TableChange> DiffTables(
+        string sheetName,
+        List<TableInfo> oldTables,
+        List<TableInfo> newTables)
+    {
+        var changes = new List<TableChange>();
+        var oldMap = oldTables
+            .GroupBy(BuildTableKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+        var newMap = newTables
+            .GroupBy(BuildTableKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+
+        var allKeys = new HashSet<string>(oldMap.Keys, StringComparer.Ordinal);
+        allKeys.UnionWith(newMap.Keys);
+
+        foreach (var key in allKeys.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            bool inOld = oldMap.TryGetValue(key, out var oldTable);
+            bool inNew = newMap.TryGetValue(key, out var newTable);
+
+            if (inOld && inNew)
+            {
+                if (!TableInfoEquals(oldTable!, newTable!))
+                {
+                    changes.Add(new TableChange
+                    {
+                        Sheet = sheetName,
+                        Name = GetTableIdentity(newTable),
+                        Type = "modified",
+                        Old = oldTable,
+                        New = newTable
+                    });
+                }
+            }
+            else if (inOld)
+            {
+                changes.Add(new TableChange
+                {
+                    Sheet = sheetName,
+                    Name = GetTableIdentity(oldTable),
+                    Type = "deleted",
+                    Old = oldTable
+                });
+            }
+            else if (inNew)
+            {
+                changes.Add(new TableChange
+                {
+                    Sheet = sheetName,
+                    Name = GetTableIdentity(newTable),
+                    Type = "added",
+                    New = newTable
+                });
+            }
+        }
+
+        return changes;
+    }
+
+    private static List<DataValidationChange> DiffDataValidations(
+        string sheetName,
+        List<DataValidationInfo> oldValidations,
+        List<DataValidationInfo> newValidations)
+    {
+        var changes = new List<DataValidationChange>();
+        var oldMap = oldValidations
+            .GroupBy(BuildDataValidationKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+        var newMap = newValidations
+            .GroupBy(BuildDataValidationKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+
+        var allKeys = new HashSet<string>(oldMap.Keys, StringComparer.Ordinal);
+        allKeys.UnionWith(newMap.Keys);
+
+        foreach (var key in allKeys.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            bool inOld = oldMap.TryGetValue(key, out var oldValidation);
+            bool inNew = newMap.TryGetValue(key, out var newValidation);
+
+            if (inOld && inNew)
+            {
+                if (!DataValidationInfoEquals(oldValidation!, newValidation!))
+                {
+                    changes.Add(new DataValidationChange
+                    {
+                        Sheet = sheetName,
+                        Range = newValidation!.Range ?? "",
+                        Type = "modified",
+                        Old = oldValidation,
+                        New = newValidation
+                    });
+                }
+            }
+            else if (inOld)
+            {
+                changes.Add(new DataValidationChange
+                {
+                    Sheet = sheetName,
+                    Range = oldValidation!.Range ?? "",
+                    Type = "deleted",
+                    Old = oldValidation
+                });
+            }
+            else if (inNew)
+            {
+                changes.Add(new DataValidationChange
+                {
+                    Sheet = sheetName,
+                    Range = newValidation!.Range ?? "",
+                    Type = "added",
+                    New = newValidation
+                });
+            }
+        }
+
+        return changes;
+    }
+
+    private static List<ConditionalFormatChange> DiffConditionalFormats(
+        string sheetName,
+        List<ConditionalFormatInfo> oldFormats,
+        List<ConditionalFormatInfo> newFormats)
+    {
+        var changes = new List<ConditionalFormatChange>();
+        var oldMap = oldFormats
+            .GroupBy(BuildConditionalFormatKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+        var newMap = newFormats
+            .GroupBy(BuildConditionalFormatKey, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+
+        var allKeys = new HashSet<string>(oldMap.Keys, StringComparer.Ordinal);
+        allKeys.UnionWith(newMap.Keys);
+
+        foreach (var key in allKeys.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            bool inOld = oldMap.TryGetValue(key, out var oldFormat);
+            bool inNew = newMap.TryGetValue(key, out var newFormat);
+
+            if (inOld && inNew)
+            {
+                if (!ConditionalFormatInfoEquals(oldFormat!, newFormat!))
+                {
+                    changes.Add(new ConditionalFormatChange
+                    {
+                        Sheet = sheetName,
+                        Range = newFormat!.Range ?? "",
+                        Type = "modified",
+                        Old = oldFormat,
+                        New = newFormat
+                    });
+                }
+            }
+            else if (inOld)
+            {
+                changes.Add(new ConditionalFormatChange
+                {
+                    Sheet = sheetName,
+                    Range = oldFormat!.Range ?? "",
+                    Type = "deleted",
+                    Old = oldFormat
+                });
+            }
+            else if (inNew)
+            {
+                changes.Add(new ConditionalFormatChange
+                {
+                    Sheet = sheetName,
+                    Range = newFormat!.Range ?? "",
+                    Type = "added",
+                    New = newFormat
+                });
             }
         }
 
@@ -331,6 +527,73 @@ public static class SpreadsheetDiffer
         return $"{name.ScopeSheet ?? ""}\u001f{name.Name}";
     }
 
+    private static string BuildTableKey(TableInfo table)
+    {
+        return GetTableIdentity(table);
+    }
+
+    private static string BuildDataValidationKey(DataValidationInfo validation)
+    {
+        return validation.Range
+            ?? $"{validation.Type ?? ""}\u001f{validation.Operator ?? ""}\u001f{validation.Formula1 ?? ""}\u001f{validation.Formula2 ?? ""}";
+    }
+
+    private static string BuildConditionalFormatKey(ConditionalFormatInfo format)
+    {
+        return format.Range
+            ?? string.Join("\u001f", format.RuleTypes);
+    }
+
+    private static string GetTableIdentity(TableInfo? table)
+    {
+        return table?.Name
+            ?? table?.DisplayName
+            ?? table?.Reference
+            ?? "";
+    }
+
+    private static bool TableInfoEquals(TableInfo oldTable, TableInfo newTable)
+    {
+        return oldTable.Name == newTable.Name
+            && oldTable.DisplayName == newTable.DisplayName
+            && oldTable.Reference == newTable.Reference
+            && oldTable.TotalsRowShown == newTable.TotalsRowShown
+            && oldTable.HeaderRowCount == newTable.HeaderRowCount
+            && oldTable.StyleName == newTable.StyleName;
+    }
+
+    private static bool DataValidationInfoEquals(DataValidationInfo oldValidation, DataValidationInfo newValidation)
+    {
+        return oldValidation.Range == newValidation.Range
+            && oldValidation.Type == newValidation.Type
+            && oldValidation.Operator == newValidation.Operator
+            && oldValidation.AllowBlank == newValidation.AllowBlank
+            && oldValidation.ShowInputMessage == newValidation.ShowInputMessage
+            && oldValidation.ShowErrorMessage == newValidation.ShowErrorMessage
+            && oldValidation.Formula1 == newValidation.Formula1
+            && oldValidation.Formula2 == newValidation.Formula2;
+    }
+
+    private static bool ConditionalFormatInfoEquals(ConditionalFormatInfo oldFormat, ConditionalFormatInfo newFormat)
+    {
+        return oldFormat.Range == newFormat.Range
+            && oldFormat.RuleCount == newFormat.RuleCount
+            && oldFormat.RuleTypes.SequenceEqual(newFormat.RuleTypes)
+            && oldFormat.Priorities.SequenceEqual(newFormat.Priorities)
+            && oldFormat.Rules.Count == newFormat.Rules.Count
+            && oldFormat.Rules.Zip(newFormat.Rules, ConditionalFormatRuleInfoEquals).All(x => x);
+    }
+
+    private static bool ConditionalFormatRuleInfoEquals(ConditionalFormatRuleInfo oldRule, ConditionalFormatRuleInfo newRule)
+    {
+        return oldRule.Type == newRule.Type
+            && oldRule.Operator == newRule.Operator
+            && oldRule.Priority == newRule.Priority
+            && oldRule.StopIfTrue == newRule.StopIfTrue
+            && oldRule.FillColor == newRule.FillColor
+            && oldRule.Formulas.SequenceEqual(newRule.Formulas);
+    }
+
     /// <summary>
     /// Produce a sortable key from a cell reference (e.g., "A1" → (1,1), "B10" → (10,2)).
     /// Sorts by row first, then column.
@@ -475,6 +738,69 @@ public static class SpreadsheetDiffer
             }
         }
 
+        if (result.MetadataDiff.TableChanges.Count > 0)
+        {
+            Console.WriteLine("\nTable Changes");
+            Console.WriteLine(new string('─', 40));
+            foreach (var change in result.MetadataDiff.TableChanges)
+            {
+                switch (change.Type)
+                {
+                    case "modified":
+                        Console.WriteLine($"  ~ {change.Sheet}!{change.Name}: {FormatTable(change.Old)} → {FormatTable(change.New)}");
+                        break;
+                    case "added":
+                        Console.WriteLine($"  + {change.Sheet}!{change.Name}: {FormatTable(change.New)}");
+                        break;
+                    case "deleted":
+                        Console.WriteLine($"  - {change.Sheet}!{change.Name}: {FormatTable(change.Old)}");
+                        break;
+                }
+            }
+        }
+
+        if (result.MetadataDiff.DataValidationChanges.Count > 0)
+        {
+            Console.WriteLine("\nData Validation Changes");
+            Console.WriteLine(new string('─', 40));
+            foreach (var change in result.MetadataDiff.DataValidationChanges)
+            {
+                switch (change.Type)
+                {
+                    case "modified":
+                        Console.WriteLine($"  ~ {change.Sheet}!{change.Range}: {FormatDataValidation(change.Old)} → {FormatDataValidation(change.New)}");
+                        break;
+                    case "added":
+                        Console.WriteLine($"  + {change.Sheet}!{change.Range}: {FormatDataValidation(change.New)}");
+                        break;
+                    case "deleted":
+                        Console.WriteLine($"  - {change.Sheet}!{change.Range}: {FormatDataValidation(change.Old)}");
+                        break;
+                }
+            }
+        }
+
+        if (result.MetadataDiff.ConditionalFormatChanges.Count > 0)
+        {
+            Console.WriteLine("\nConditional Format Changes");
+            Console.WriteLine(new string('─', 40));
+            foreach (var change in result.MetadataDiff.ConditionalFormatChanges)
+            {
+                switch (change.Type)
+                {
+                    case "modified":
+                        Console.WriteLine($"  ~ {change.Sheet}!{change.Range}: {FormatConditionalFormat(change.Old)} → {FormatConditionalFormat(change.New)}");
+                        break;
+                    case "added":
+                        Console.WriteLine($"  + {change.Sheet}!{change.Range}: {FormatConditionalFormat(change.New)}");
+                        break;
+                    case "deleted":
+                        Console.WriteLine($"  - {change.Sheet}!{change.Range}: {FormatConditionalFormat(change.Old)}");
+                        break;
+                }
+            }
+        }
+
         if (result.MetadataDiff.WorkbookProtectionChange.Changed)
         {
             var protectionChange = result.MetadataDiff.WorkbookProtectionChange;
@@ -497,8 +823,44 @@ public static class SpreadsheetDiffer
             + $"{result.Summary.FormulasAdded} added, "
             + $"{result.Summary.FormulasDeleted} deleted, "
             + $"{result.Summary.StructureChanges} structure changes, "
+            + $"{result.Summary.TableChanges} table changes, "
+            + $"{result.Summary.DataValidationChanges} data validation changes, "
+            + $"{result.Summary.ConditionalFormatChanges} conditional format changes, "
             + $"{result.Summary.MetadataChanges} metadata changes");
         Console.WriteLine();
+    }
+
+    private static string FormatTable(TableInfo? table)
+    {
+        if (table == null)
+        {
+            return "(none)";
+        }
+
+        return $"{table.Reference ?? "?"} style={table.StyleName ?? "(default)"} totals={table.TotalsRowShown}";
+    }
+
+    private static string FormatDataValidation(DataValidationInfo? validation)
+    {
+        if (validation == null)
+        {
+            return "(none)";
+        }
+
+        return $"{validation.Type ?? "unknown"} {validation.Operator ?? ""} [{validation.Formula1 ?? ""}{(validation.Formula2 != null ? $", {validation.Formula2}" : "")}]".Trim();
+    }
+
+    private static string FormatConditionalFormat(ConditionalFormatInfo? format)
+    {
+        if (format == null)
+        {
+            return "(none)";
+        }
+
+        string types = format.RuleTypes.Count > 0
+            ? string.Join(",", format.RuleTypes)
+            : "unknown";
+        return $"{format.Range ?? "?"} rules={format.RuleCount} types={types}";
     }
 
     private static string Trunc(string s, int max) =>

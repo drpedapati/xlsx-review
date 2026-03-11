@@ -381,7 +381,7 @@ public class SpreadsheetEditor
         return worksheetPart.Worksheet.GetFirstChild<SheetProtection>() != null;
     }
 
-    private static List<TableInfo> GetTableInfos(WorksheetPart worksheetPart)
+    internal static List<TableInfo> GetTableInfos(WorksheetPart worksheetPart)
     {
         return worksheetPart.TableDefinitionParts
             .Select(part =>
@@ -400,7 +400,7 @@ public class SpreadsheetEditor
             .ToList();
     }
 
-    private static List<DataValidationInfo> GetDataValidationInfos(WorksheetPart worksheetPart)
+    internal static List<DataValidationInfo> GetDataValidationInfos(WorksheetPart worksheetPart)
     {
         return worksheetPart.Worksheet.Elements<DataValidations>()
             .SelectMany(x => x.Elements<DataValidation>())
@@ -418,7 +418,7 @@ public class SpreadsheetEditor
             .ToList();
     }
 
-    private static List<ConditionalFormatInfo> GetConditionalFormatInfos(WorksheetPart worksheetPart)
+    internal static List<ConditionalFormatInfo> GetConditionalFormatInfos(WorksheetPart worksheetPart)
     {
         return worksheetPart.Worksheet.Elements<ConditionalFormatting>()
             .Select(format => new ConditionalFormatInfo

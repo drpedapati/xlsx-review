@@ -16,6 +16,7 @@ Already supported well:
 - worksheet add/rename/delete
 - legacy comments
 - workbook creation from blank or template
+- diff for workbook metadata, tables, data validation, and conditional formatting
 
 Already readable, but not fully editable/diffable across the board:
 
@@ -91,6 +92,9 @@ Deliverables:
 - table create/update/delete
 - data validation create/update/delete
 - conditional formatting create/update/delete
+- semantic diff for table changes
+- semantic diff for data validation changes
+- semantic diff for conditional formatting changes
 
 Reason:
 

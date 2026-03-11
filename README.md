@@ -265,7 +265,7 @@ Now `git diff` shows readable text diffs for Excel files.
 | **Formulas** | Formula changes distinguished from value changes |
 | **Sheet structure** | Added or removed worksheets (matched by name) |
 | **Row/column counts** | Dimension changes within sheets |
-| **Workbook metadata** | Sheet visibility, defined names, worksheet protection, and workbook protection changes |
+| **Workbook metadata** | Sheet visibility, defined names, worksheet protection, workbook protection, tables, data validations, and conditional formatting changes |
 | **Comments** | Added, removed, or modified cell comments |
 
 ## CLI Flags

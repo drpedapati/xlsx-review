@@ -117,6 +117,15 @@ public class MetadataDiff
     [JsonPropertyName("defined_name_changes")]
     public List<DefinedNameChange> DefinedNameChanges { get; set; } = new();
 
+    [JsonPropertyName("table_changes")]
+    public List<TableChange> TableChanges { get; set; } = new();
+
+    [JsonPropertyName("data_validation_changes")]
+    public List<DataValidationChange> DataValidationChanges { get; set; } = new();
+
+    [JsonPropertyName("conditional_format_changes")]
+    public List<ConditionalFormatChange> ConditionalFormatChanges { get; set; } = new();
+
     [JsonPropertyName("workbook_protection_change")]
     public WorkbookProtectionChange WorkbookProtectionChange { get; set; } = new();
 }
@@ -205,6 +214,60 @@ public class WorkbookProtectionChange
     public WorkbookProtectionInfo New { get; set; } = new();
 }
 
+public class TableChange
+{
+    [JsonPropertyName("sheet")]
+    public string Sheet { get; set; } = "";
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    [JsonPropertyName("old")]
+    public TableInfo? Old { get; set; }
+
+    [JsonPropertyName("new")]
+    public TableInfo? New { get; set; }
+}
+
+public class DataValidationChange
+{
+    [JsonPropertyName("sheet")]
+    public string Sheet { get; set; } = "";
+
+    [JsonPropertyName("range")]
+    public string Range { get; set; } = "";
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    [JsonPropertyName("old")]
+    public DataValidationInfo? Old { get; set; }
+
+    [JsonPropertyName("new")]
+    public DataValidationInfo? New { get; set; }
+}
+
+public class ConditionalFormatChange
+{
+    [JsonPropertyName("sheet")]
+    public string Sheet { get; set; } = "";
+
+    [JsonPropertyName("range")]
+    public string Range { get; set; } = "";
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    [JsonPropertyName("old")]
+    public ConditionalFormatInfo? Old { get; set; }
+
+    [JsonPropertyName("new")]
+    public ConditionalFormatInfo? New { get; set; }
+}
+
 // ── Summary ────────────────────────────────────────────────────
 
 public class XlsxDiffSummary
@@ -244,6 +307,15 @@ public class XlsxDiffSummary
 
     [JsonPropertyName("defined_name_changes")]
     public int DefinedNameChanges { get; set; }
+
+    [JsonPropertyName("table_changes")]
+    public int TableChanges { get; set; }
+
+    [JsonPropertyName("data_validation_changes")]
+    public int DataValidationChanges { get; set; }
+
+    [JsonPropertyName("conditional_format_changes")]
+    public int ConditionalFormatChanges { get; set; }
 
     [JsonPropertyName("workbook_protection_changes")]
     public int WorkbookProtectionChanges { get; set; }

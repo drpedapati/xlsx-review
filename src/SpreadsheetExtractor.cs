@@ -27,6 +27,9 @@ public class ExtractedSheet
     public bool Protected { get; set; }
     public int MaxRow { get; set; }
     public int MaxColumn { get; set; }
+    public List<TableInfo> Tables { get; set; } = new();
+    public List<DataValidationInfo> DataValidations { get; set; } = new();
+    public List<ConditionalFormatInfo> ConditionalFormats { get; set; } = new();
     public Dictionary<string, ExtractedCell> Cells { get; set; } = new();
 }
 
@@ -86,6 +89,9 @@ public static class SpreadsheetExtractor
                 continue;
             }
             extracted.Protected = SpreadsheetEditor.IsSheetProtected(worksheetPart);
+            extracted.Tables = SpreadsheetEditor.GetTableInfos(worksheetPart);
+            extracted.DataValidations = SpreadsheetEditor.GetDataValidationInfos(worksheetPart);
+            extracted.ConditionalFormats = SpreadsheetEditor.GetConditionalFormatInfos(worksheetPart);
 
             var rows = worksheetPart.Worksheet.Descendants<Row>();
             int maxRow = 0;

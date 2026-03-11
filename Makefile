@@ -13,6 +13,7 @@
 #   make test-worksheet-ux # Run worksheet UX smoke test
 #   make test-hyperlinks # Run hyperlink smoke test
 #   make test-print-layout # Run print layout smoke test
+#   make test-data-validation # Run data validation smoke test
 #   make corpus-download  # Download public XLSX regression corpus
 #   make corpus-smoke     # Run a curated read smoke suite from the public corpus
 #   make corpus-check     # Run read checks across the public corpus
@@ -45,7 +46,7 @@ PUBLISH_FLAGS := -c Release \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 
-.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
+.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout test-data-validation corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
 
 ## build: Build single-file binary for current platform
 build:
@@ -108,6 +109,7 @@ smoke: build-release
 	@$(MAKE) --no-print-directory test-worksheet-ux
 	@$(MAKE) --no-print-directory test-hyperlinks
 	@$(MAKE) --no-print-directory test-print-layout
+	@$(MAKE) --no-print-directory test-data-validation
 	@echo "✅ Smoke tests passed"
 	@ls -lh $(BUILD_DIR)/smoke-output.xlsx $(BUILD_DIR)/smoke-created.xlsx
 
@@ -214,6 +216,21 @@ test-print-layout: build-release
 	@ls -lh $(BUILD_DIR)/print-output.xlsx $(BUILD_DIR)/print-created.xlsx $(BUILD_DIR)/print-reset.xlsx
 	@echo "✅ Print layout tests passed"
 
+## test-data-validation: Exercise data validation edits with read-back assertions
+test-data-validation: build-release
+	@echo "Testing data validation..."
+	@$(LOCAL_RUNNER) examples/test_old.xlsx examples/sample-data-validation-edits.json -o $(BUILD_DIR)/validation-output.xlsx --json > $(BUILD_DIR)/test-data-validation.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-data-validation.json
+	@echo "Testing data validation create..."
+	@$(LOCAL_RUNNER) --create --template examples/test_old.xlsx -o $(BUILD_DIR)/validation-created.xlsx examples/sample-data-validation-edits.json --json > $(BUILD_DIR)/test-data-validation-create.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-data-validation-create.json
+	@echo "Testing data validation cleanup..."
+	@$(LOCAL_RUNNER) $(BUILD_DIR)/validation-output.xlsx examples/sample-data-validation-cleanup.json -o $(BUILD_DIR)/validation-reset.xlsx --json > $(BUILD_DIR)/test-data-validation-reset.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-data-validation-reset.json
+	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-data-validation-smoke.tsv
+	@ls -lh $(BUILD_DIR)/validation-output.xlsx $(BUILD_DIR)/validation-created.xlsx $(BUILD_DIR)/validation-reset.xlsx
+	@echo "✅ Data validation tests passed"
+
 ## corpus-download: Download the public XLSX regression corpus
 corpus-download:
 	@./scripts/download_public_corpus.sh
@@ -261,6 +278,7 @@ help:
 	@echo "  make test-worksheet-ux            # Exercise worksheet UX features"
 	@echo "  make test-hyperlinks              # Exercise hyperlink features"
 	@echo "  make test-print-layout            # Exercise print layout features"
+	@echo "  make test-data-validation         # Exercise data validation features"
 	@echo "  make corpus-download              # Download public XLSX corpus"
 	@echo "  make corpus-smoke                 # Run the curated corpus smoke suite"
 	@echo "  make corpus-feature-smoke         # Assert workbook/sheet feature metadata"

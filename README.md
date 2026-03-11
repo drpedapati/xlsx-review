@@ -83,6 +83,9 @@ xlsx-review input.xlsx examples/sample-hyperlink-edits.json -o linked.xlsx
 # Configure print layout
 xlsx-review input.xlsx examples/sample-print-layout-edits.json -o printable.xlsx
 
+# Add worksheet data validation rules
+xlsx-review input.xlsx examples/sample-data-validation-edits.json -o validated.xlsx
+
 # Read spreadsheet (human-readable)
 xlsx-review input.xlsx --read
 
@@ -152,6 +155,8 @@ that there is no input workbook when you pass `--create`.
 | `clear_print_area` | `sheet` | Remove the worksheet print area |
 | `set_page_orientation` | `sheet`, `orientation` | Set page orientation to `portrait` or `landscape` |
 | `clear_page_orientation` | `sheet` | Clear explicit page orientation |
+| `set_data_validation` | `sheet`, `range`, `validation_type`, `formula1` | Add or replace a worksheet data validation rule. Optional fields: `validation_operator`, `formula2`, `allow_blank`, `show_input_message`, `show_error_message`. |
+| `clear_data_validation` | `sheet`, `range` | Remove a worksheet data validation rule that exactly matches the target range |
 
 ## Create Mode
 
@@ -188,6 +193,7 @@ The current worksheet UX tranche covers:
 - hyperlinks
 - print area
 - page orientation
+- data validation
 
 See [docs/advanced-features-roadmap.md](/Users/ernie/Documents/irl_projects/xlsx-review/docs/advanced-features-roadmap.md) for the phased plan covering the rest of worksheet UX, tables, validations, conditional formats, richer formula handling, charts, pivots, and connected-workbook features.
 
@@ -279,6 +285,9 @@ make test         # Run test (requires TEST_DOC=path/to/spreadsheet.xlsx)
 make test-create  # Run blank/template create smoke tests
 make test-advanced  # Run advanced workbook metadata smoke test
 make test-worksheet-ux  # Run worksheet UX smoke test
+make test-hyperlinks  # Run hyperlink smoke test
+make test-print-layout  # Run print layout smoke test
+make test-data-validation  # Run data validation smoke test
 make corpus-download  # Download the public XLSX regression corpus
 make corpus-smoke     # Run published-binary corpus smoke checks
 make corpus-feature-smoke  # Assert workbook/sheet metadata on representative files

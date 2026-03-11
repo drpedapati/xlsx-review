@@ -1,0 +1,16 @@
+# path	field	expected
+validation-output.xlsx	sheet:Data.data_validation_count	=2
+validation-output.xlsx	sheet:Data.data_validations.0.range	=C2:C6
+validation-output.xlsx	sheet:Data.data_validations.0.type	=whole
+validation-output.xlsx	sheet:Data.data_validations.0.operator	=between
+validation-output.xlsx	sheet:Data.data_validations.0.formula1	contains:0
+validation-output.xlsx	sheet:Data.data_validations.0.formula2	contains:100
+validation-output.xlsx	sheet:Data.data_validations.0.show_error_message	=true
+validation-output.xlsx	sheet:Data.data_validations.1.range	=D2:D6
+validation-output.xlsx	sheet:Data.data_validations.1.type	=list
+validation-output.xlsx	sheet:Data.data_validations.1.formula1	contains:Control,Treatment
+validation-output.xlsx	sheet:Data.data_validations.1.allow_blank	=true
+validation-created.xlsx	sheet:Data.data_validation_count	=2
+validation-created.xlsx	sheet:Data.data_validations.0.type	=whole
+validation-created.xlsx	sheet:Data.data_validations.1.type	=list
+validation-reset.xlsx	sheet:Data.data_validation_count	=0

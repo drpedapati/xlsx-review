@@ -100,6 +100,27 @@ public class Change
     [JsonPropertyName("orientation")]
     public string? Orientation { get; set; }
 
+    [JsonPropertyName("validation_type")]
+    public string? ValidationType { get; set; }
+
+    [JsonPropertyName("validation_operator")]
+    public string? ValidationOperator { get; set; }
+
+    [JsonPropertyName("formula1")]
+    public string? Formula1 { get; set; }
+
+    [JsonPropertyName("formula2")]
+    public string? Formula2 { get; set; }
+
+    [JsonPropertyName("allow_blank")]
+    public bool? AllowBlank { get; set; }
+
+    [JsonPropertyName("show_input_message")]
+    public bool? ShowInputMessage { get; set; }
+
+    [JsonPropertyName("show_error_message")]
+    public bool? ShowErrorMessage { get; set; }
+
     [JsonPropertyName("enabled")]
     public bool? Enabled { get; set; }
 

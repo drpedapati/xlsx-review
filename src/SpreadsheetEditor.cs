@@ -407,8 +407,8 @@ public class SpreadsheetEditor
             .Select(validation => new DataValidationInfo
             {
                 Range = validation.SequenceOfReferences?.InnerText,
-                Type = validation.Type?.Value.ToString(),
-                Operator = validation.Operator?.Value.ToString(),
+                Type = GetDataValidationTypeName(validation),
+                Operator = GetDataValidationOperatorName(validation),
                 AllowBlank = validation.AllowBlank?.Value ?? false,
                 ShowInputMessage = validation.ShowInputMessage?.Value ?? false,
                 ShowErrorMessage = validation.ShowErrorMessage?.Value ?? false,
@@ -511,6 +511,40 @@ public class SpreadsheetEditor
         if (orientation == OrientationValues.Portrait)
             return "portrait";
         return null;
+    }
+
+    private static string? GetDataValidationTypeName(DataValidation validation)
+    {
+        var type = validation.Type?.Value;
+        if (type == null)
+            return null;
+
+        return type == DataValidationValues.None ? "none"
+            : type == DataValidationValues.Whole ? "whole"
+            : type == DataValidationValues.Decimal ? "decimal"
+            : type == DataValidationValues.List ? "list"
+            : type == DataValidationValues.Date ? "date"
+            : type == DataValidationValues.Time ? "time"
+            : type == DataValidationValues.TextLength ? "textLength"
+            : type == DataValidationValues.Custom ? "custom"
+            : validation.Type?.InnerText;
+    }
+
+    private static string? GetDataValidationOperatorName(DataValidation validation)
+    {
+        var op = validation.Operator?.Value;
+        if (op == null)
+            return null;
+
+        return op == DataValidationOperatorValues.Between ? "between"
+            : op == DataValidationOperatorValues.NotBetween ? "notBetween"
+            : op == DataValidationOperatorValues.Equal ? "equal"
+            : op == DataValidationOperatorValues.NotEqual ? "notEqual"
+            : op == DataValidationOperatorValues.LessThan ? "lessThan"
+            : op == DataValidationOperatorValues.LessThanOrEqual ? "lessThanOrEqual"
+            : op == DataValidationOperatorValues.GreaterThan ? "greaterThan"
+            : op == DataValidationOperatorValues.GreaterThanOrEqual ? "greaterThanOrEqual"
+            : validation.Operator?.InnerText;
     }
 
     internal static string GetSheetVisibility(Sheet sheet)
@@ -666,6 +700,13 @@ public class SpreadsheetEditor
             "clear_print_area" => !string.IsNullOrEmpty(c.Sheet),
             "set_page_orientation" => !string.IsNullOrEmpty(c.Sheet) && IsValidPageOrientation(c.Orientation),
             "clear_page_orientation" => !string.IsNullOrEmpty(c.Sheet),
+            "set_data_validation" => !string.IsNullOrEmpty(c.Sheet)
+                && !string.IsNullOrEmpty(c.Range)
+                && IsValidDataValidationType(c.ValidationType)
+                && IsValidDataValidationOperator(c.ValidationOperator)
+                && !string.IsNullOrEmpty(c.Formula1)
+                && (!RequiresSecondValidationFormula(c.ValidationOperator) || !string.IsNullOrEmpty(c.Formula2)),
+            "clear_data_validation" => !string.IsNullOrEmpty(c.Sheet) && !string.IsNullOrEmpty(c.Range),
             _ => false
         };
 
@@ -707,6 +748,8 @@ public class SpreadsheetEditor
         "clear_print_area" => $"Cleared print area on {c.Sheet}",
         "set_page_orientation" => $"Set page orientation on {c.Sheet} to {NormalizePageOrientation(c.Orientation!)}",
         "clear_page_orientation" => $"Cleared page orientation on {c.Sheet}",
+        "set_data_validation" => $"Set data validation on {c.Sheet}!{c.Range} ({c.ValidationType})",
+        "clear_data_validation" => $"Cleared data validation on {c.Sheet}!{c.Range}",
         _ => $"Unknown change type: {c.Type}"
     };
 
@@ -792,6 +835,12 @@ public class SpreadsheetEditor
                 break;
             case "clear_page_orientation":
                 ClearPageOrientation(workbookPart, c.Sheet!);
+                break;
+            case "set_data_validation":
+                SetDataValidation(workbookPart, c);
+                break;
+            case "clear_data_validation":
+                ClearDataValidation(workbookPart, c.Sheet!, c.Range!);
                 break;
             default:
                 throw new Exception($"Unknown change type: {c.Type}");
@@ -1407,6 +1456,85 @@ public class SpreadsheetEditor
             pageSetup.Remove();
     }
 
+    private void SetDataValidation(WorkbookPart workbookPart, Change change)
+    {
+        var worksheet = GetWorksheetPart(workbookPart, change.Sheet!).Worksheet;
+        var dataValidations = worksheet.GetFirstChild<DataValidations>();
+        if (dataValidations == null)
+        {
+            dataValidations = InsertWorksheetElementAfterPredecessors(
+                worksheet,
+                new DataValidations(),
+                typeof(ConditionalFormatting),
+                typeof(CustomSheetViews),
+                typeof(MergeCells),
+                typeof(DataConsolidate),
+                typeof(SortState),
+                typeof(AutoFilter),
+                typeof(Scenarios),
+                typeof(ProtectedRanges),
+                typeof(SheetProtection),
+                typeof(SheetCalculationProperties),
+                typeof(DocumentFormat.OpenXml.Spreadsheet.SheetData));
+        }
+
+        string normalizedRange = NormalizeSequenceOfReferences(change.Range!);
+        foreach (var existing in dataValidations.Elements<DataValidation>()
+                     .Where(validation => NormalizeSequenceOfReferences(validation.SequenceOfReferences?.InnerText) == normalizedRange)
+                     .ToList())
+        {
+            existing.Remove();
+        }
+
+        var validation = new DataValidation
+        {
+            Type = ParseDataValidationType(change.ValidationType!),
+            SequenceOfReferences = new ListValue<StringValue> { InnerText = normalizedRange }
+        };
+
+        if (change.AllowBlank != null)
+            validation.AllowBlank = change.AllowBlank.Value;
+
+        if (change.ShowInputMessage != null)
+            validation.ShowInputMessage = change.ShowInputMessage.Value;
+
+        if (change.ShowErrorMessage != null)
+            validation.ShowErrorMessage = change.ShowErrorMessage.Value;
+
+        if (!string.IsNullOrWhiteSpace(change.ValidationOperator))
+            validation.Operator = ParseDataValidationOperator(change.ValidationOperator!);
+
+        validation.AppendChild(new Formula1(change.Formula1!));
+        if (!string.IsNullOrWhiteSpace(change.Formula2))
+            validation.AppendChild(new Formula2(change.Formula2!));
+
+        dataValidations.AppendChild(validation);
+        dataValidations.Count = (uint)dataValidations.Elements<DataValidation>().Count();
+    }
+
+    private void ClearDataValidation(WorkbookPart workbookPart, string sheetName, string range)
+    {
+        var worksheet = GetWorksheetPart(workbookPart, sheetName).Worksheet;
+        var dataValidations = worksheet.GetFirstChild<DataValidations>()
+            ?? throw new Exception($"Sheet '{sheetName}' has no data validations");
+
+        string normalizedRange = NormalizeSequenceOfReferences(range);
+        var matches = dataValidations.Elements<DataValidation>()
+            .Where(validation => NormalizeSequenceOfReferences(validation.SequenceOfReferences?.InnerText) == normalizedRange)
+            .ToList();
+
+        if (matches.Count == 0)
+            throw new Exception($"Data validation '{sheetName}!{range}' not found");
+
+        foreach (var match in matches)
+            match.Remove();
+
+        if (!dataValidations.Elements<DataValidation>().Any())
+            dataValidations.Remove();
+        else
+            dataValidations.Count = (uint)dataValidations.Elements<DataValidation>().Count();
+    }
+
     // ── Comments (Legacy Notes) ──
 
     private void ApplyComment(WorkbookPart workbookPart, CommentDef commentDef)
@@ -1761,6 +1889,123 @@ public class SpreadsheetEditor
         };
     }
 
+    private static bool IsValidDataValidationType(string? validationType)
+    {
+        return TryParseDataValidationType(validationType, out _);
+    }
+
+    private static bool IsValidDataValidationOperator(string? validationOperator)
+    {
+        return validationOperator == null || TryParseDataValidationOperator(validationOperator, out _);
+    }
+
+    private static bool RequiresSecondValidationFormula(string? validationOperator)
+    {
+        if (!TryParseDataValidationOperator(validationOperator, out var parsed))
+            return false;
+
+        return parsed == DataValidationOperatorValues.Between
+            || parsed == DataValidationOperatorValues.NotBetween;
+    }
+
+    private static DataValidationValues ParseDataValidationType(string validationType)
+    {
+        if (TryParseDataValidationType(validationType, out var parsed))
+            return parsed;
+
+        throw new Exception("Validation type must be one of: none, whole, decimal, list, date, time, textLength, custom");
+    }
+
+    private static bool TryParseDataValidationType(string? validationType, out DataValidationValues parsed)
+    {
+        string normalized = NormalizeValidationKeyword(validationType);
+        switch (normalized)
+        {
+            case "none":
+            case "any":
+                parsed = DataValidationValues.None;
+                return true;
+            case "whole":
+            case "wholenumber":
+            case "integer":
+                parsed = DataValidationValues.Whole;
+                return true;
+            case "decimal":
+                parsed = DataValidationValues.Decimal;
+                return true;
+            case "list":
+                parsed = DataValidationValues.List;
+                return true;
+            case "date":
+                parsed = DataValidationValues.Date;
+                return true;
+            case "time":
+                parsed = DataValidationValues.Time;
+                return true;
+            case "textlength":
+            case "length":
+                parsed = DataValidationValues.TextLength;
+                return true;
+            case "custom":
+                parsed = DataValidationValues.Custom;
+                return true;
+            default:
+                parsed = default;
+                return false;
+        }
+    }
+
+    private static DataValidationOperatorValues ParseDataValidationOperator(string validationOperator)
+    {
+        if (TryParseDataValidationOperator(validationOperator, out var parsed))
+            return parsed;
+
+        throw new Exception("Validation operator must be one of: between, notBetween, equal, notEqual, lessThan, lessThanOrEqual, greaterThan, greaterThanOrEqual");
+    }
+
+    private static bool TryParseDataValidationOperator(string? validationOperator, out DataValidationOperatorValues parsed)
+    {
+        string normalized = NormalizeValidationKeyword(validationOperator);
+        switch (normalized)
+        {
+            case "between":
+                parsed = DataValidationOperatorValues.Between;
+                return true;
+            case "notbetween":
+                parsed = DataValidationOperatorValues.NotBetween;
+                return true;
+            case "equal":
+                parsed = DataValidationOperatorValues.Equal;
+                return true;
+            case "notequal":
+                parsed = DataValidationOperatorValues.NotEqual;
+                return true;
+            case "lessthan":
+                parsed = DataValidationOperatorValues.LessThan;
+                return true;
+            case "lessthanorequal":
+                parsed = DataValidationOperatorValues.LessThanOrEqual;
+                return true;
+            case "greaterthan":
+                parsed = DataValidationOperatorValues.GreaterThan;
+                return true;
+            case "greaterthanorequal":
+                parsed = DataValidationOperatorValues.GreaterThanOrEqual;
+                return true;
+            default:
+                parsed = default;
+                return false;
+        }
+    }
+
+    private static string NormalizeValidationKeyword(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
+        return Regex.Replace(value.Trim(), @"[\s_-]+", "").ToLowerInvariant();
+    }
+
     private static string NormalizePrintArea(string sheetName, string range)
     {
         string trimmed = range.Trim();
@@ -1771,6 +2016,14 @@ public class SpreadsheetEditor
             return trimmed;
 
         return $"{QuoteSheetName(sheetName)}!{trimmed}";
+    }
+
+    private static string NormalizeSequenceOfReferences(string? range)
+    {
+        if (string.IsNullOrWhiteSpace(range))
+            return "";
+
+        return Regex.Replace(range.Trim(), @"\s+", " ");
     }
 
     private static string QuoteSheetName(string sheetName)

@@ -1,0 +1,23 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "set_data_validation",
+      "sheet": "Data",
+      "range": "C2:C6",
+      "validation_type": "whole",
+      "validation_operator": "between",
+      "formula1": "0",
+      "formula2": "100",
+      "show_error_message": true
+    },
+    {
+      "type": "set_data_validation",
+      "sheet": "Data",
+      "range": "D2:D6",
+      "validation_type": "list",
+      "formula1": "\"Control,Treatment\"",
+      "allow_blank": true
+    }
+  ]
+}

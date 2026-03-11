@@ -453,7 +453,8 @@ JSON Manifest Format:
       { ""type"": ""set_auto_filter"", ""sheet"": ""Data"", ""range"": ""A1:D6"" },
       { ""type"": ""set_hyperlink"", ""sheet"": ""Data"", ""cell"": ""A2"", ""url"": ""https://example.com/p001"" },
       { ""type"": ""set_print_area"", ""sheet"": ""Data"", ""range"": ""$A$1:$D$6"" },
-      { ""type"": ""set_page_orientation"", ""sheet"": ""Data"", ""orientation"": ""landscape"" }
+      { ""type"": ""set_page_orientation"", ""sheet"": ""Data"", ""orientation"": ""landscape"" },
+      { ""type"": ""set_data_validation"", ""sheet"": ""Data"", ""range"": ""D2:D6"", ""validation_type"": ""list"", ""formula1"": ""\""Control,Treatment\"""" }
     ],
     ""comments"": [
       { ""sheet"": ""Sheet1"", ""cell"": ""A1"", ""text"": ""Review note"" }

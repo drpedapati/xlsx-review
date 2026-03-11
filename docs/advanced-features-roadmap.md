@@ -84,7 +84,7 @@ These are common workbook behaviors that users perceive as part of the document,
 
 ### Phase 4: Tables and Rules
 
-Status: in progress
+Status: shipped
 
 Deliverables:
 

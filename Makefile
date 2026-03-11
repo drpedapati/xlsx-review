@@ -15,6 +15,7 @@
 #   make test-print-layout # Run print layout smoke test
 #   make test-data-validation # Run data validation smoke test
 #   make test-conditional-format # Run conditional format smoke test
+#   make test-tables # Run table smoke test
 #   make corpus-download  # Download public XLSX regression corpus
 #   make corpus-smoke     # Run a curated read smoke suite from the public corpus
 #   make corpus-check     # Run read checks across the public corpus
@@ -47,7 +48,7 @@ PUBLISH_FLAGS := -c Release \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 
-.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout test-data-validation test-conditional-format corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
+.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced test-worksheet-ux test-hyperlinks test-print-layout test-data-validation test-conditional-format test-tables corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
 
 ## build: Build single-file binary for current platform
 build:
@@ -112,6 +113,7 @@ smoke: build-release
 	@$(MAKE) --no-print-directory test-print-layout
 	@$(MAKE) --no-print-directory test-data-validation
 	@$(MAKE) --no-print-directory test-conditional-format
+	@$(MAKE) --no-print-directory test-tables
 	@echo "✅ Smoke tests passed"
 	@ls -lh $(BUILD_DIR)/smoke-output.xlsx $(BUILD_DIR)/smoke-created.xlsx
 
@@ -248,6 +250,21 @@ test-conditional-format: build-release
 	@ls -lh $(BUILD_DIR)/conditional-output.xlsx $(BUILD_DIR)/conditional-created.xlsx $(BUILD_DIR)/conditional-reset.xlsx
 	@echo "✅ Conditional formatting tests passed"
 
+## test-tables: Exercise table edits with read-back assertions
+test-tables: build-release
+	@echo "Testing tables..."
+	@$(LOCAL_RUNNER) examples/test_old.xlsx examples/sample-table-edits.json -o $(BUILD_DIR)/table-output.xlsx --json > $(BUILD_DIR)/test-table.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-table.json
+	@echo "Testing table create..."
+	@$(LOCAL_RUNNER) --create --template examples/test_old.xlsx -o $(BUILD_DIR)/table-created.xlsx examples/sample-table-edits.json --json > $(BUILD_DIR)/test-table-create.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-table-create.json
+	@echo "Testing table cleanup..."
+	@$(LOCAL_RUNNER) $(BUILD_DIR)/table-output.xlsx examples/sample-table-cleanup.json -o $(BUILD_DIR)/table-reset.xlsx --json > $(BUILD_DIR)/test-table-reset.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-table-reset.json
+	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-table-smoke.tsv
+	@ls -lh $(BUILD_DIR)/table-output.xlsx $(BUILD_DIR)/table-created.xlsx $(BUILD_DIR)/table-reset.xlsx
+	@echo "✅ Table tests passed"
+
 ## corpus-download: Download the public XLSX regression corpus
 corpus-download:
 	@./scripts/download_public_corpus.sh
@@ -297,6 +314,7 @@ help:
 	@echo "  make test-print-layout            # Exercise print layout features"
 	@echo "  make test-data-validation         # Exercise data validation features"
 	@echo "  make test-conditional-format      # Exercise conditional formatting features"
+	@echo "  make test-tables                  # Exercise table features"
 	@echo "  make corpus-download              # Download public XLSX corpus"
 	@echo "  make corpus-smoke                 # Run the curated corpus smoke suite"
 	@echo "  make corpus-feature-smoke         # Assert workbook/sheet feature metadata"

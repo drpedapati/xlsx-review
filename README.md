@@ -89,6 +89,9 @@ xlsx-review input.xlsx examples/sample-data-validation-edits.json -o validated.x
 # Add conditional formatting rules
 xlsx-review input.xlsx examples/sample-conditional-format-edits.json -o highlighted.xlsx
 
+# Add an Excel table
+xlsx-review input.xlsx examples/sample-table-edits.json -o tabular.xlsx
+
 # Read spreadsheet (human-readable)
 xlsx-review input.xlsx --read
 
@@ -141,6 +144,8 @@ that there is no input workbook when you pass `--create`.
 | `add_sheet` | `name` | Add a new worksheet |
 | `rename_sheet` | `from`, `to` | Rename a worksheet |
 | `delete_sheet` | `name` | Delete a worksheet |
+| `set_table` | `sheet`, `range`, `name` | Add or replace an Excel table on a sheet. Optional fields: `display_name`, `style_name`, `header_row_count` (currently only `1`), `totals_row_shown`. |
+| `delete_table` | `name` | Delete an Excel table by table name |
 | `set_sheet_visibility` | `name` or `sheet`, `visibility` | Set worksheet visibility to `visible`, `hidden`, or `veryHidden` |
 | `set_defined_name` | `name`, `refers_to` | Add or update a workbook-scoped or sheet-scoped defined name (`scope_sheet` optional) |
 | `delete_defined_name` | `name` | Delete a workbook-scoped or sheet-scoped defined name (`scope_sheet` optional) |
@@ -198,6 +203,7 @@ The current worksheet UX tranche covers:
 - hyperlinks
 - print area
 - page orientation
+- tables
 - data validation
 - conditional formatting
 
@@ -295,6 +301,7 @@ make test-hyperlinks  # Run hyperlink smoke test
 make test-print-layout  # Run print layout smoke test
 make test-data-validation  # Run data validation smoke test
 make test-conditional-format  # Run conditional formatting smoke test
+make test-tables  # Run table smoke test
 make corpus-download  # Download the public XLSX regression corpus
 make corpus-smoke     # Run published-binary corpus smoke checks
 make corpus-feature-smoke  # Assert workbook/sheet metadata on representative files

@@ -1,0 +1,12 @@
+# path	field	expected
+table-output.xlsx	sheet:Data.table_count	=1
+table-output.xlsx	sheet:Data.tables.0.name	=PatientScores
+table-output.xlsx	sheet:Data.tables.0.display_name	=PatientScores
+table-output.xlsx	sheet:Data.tables.0.reference	=A1:D6
+table-output.xlsx	sheet:Data.tables.0.style_name	=TableStyleMedium2
+table-output.xlsx	sheet:Data.tables.0.header_row_count	=1
+table-output.xlsx	sheet:Data.tables.0.totals_row_shown	=false
+table-created.xlsx	sheet:Data.table_count	=1
+table-created.xlsx	sheet:Data.tables.0.name	=PatientScores
+table-created.xlsx	sheet:Data.tables.0.reference	=A1:D6
+table-reset.xlsx	sheet:Data.table_count	=0

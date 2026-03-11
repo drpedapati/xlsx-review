@@ -97,6 +97,12 @@ public class Change
     [JsonPropertyName("url")]
     public string? Url { get; set; }
 
+    [JsonPropertyName("display_name")]
+    public string? DisplayName { get; set; }
+
+    [JsonPropertyName("style_name")]
+    public string? StyleName { get; set; }
+
     [JsonPropertyName("orientation")]
     public string? Orientation { get; set; }
 
@@ -135,6 +141,12 @@ public class Change
 
     [JsonPropertyName("stop_if_true")]
     public bool? StopIfTrue { get; set; }
+
+    [JsonPropertyName("totals_row_shown")]
+    public bool? TotalsRowShown { get; set; }
+
+    [JsonPropertyName("header_row_count")]
+    public uint? HeaderRowCount { get; set; }
 
     [JsonPropertyName("enabled")]
     public bool? Enabled { get; set; }

@@ -696,6 +696,13 @@ public class SpreadsheetEditor
             "add_sheet" => !string.IsNullOrEmpty(c.Name),
             "rename_sheet" => !string.IsNullOrEmpty(c.From) && !string.IsNullOrEmpty(c.To),
             "delete_sheet" => !string.IsNullOrEmpty(c.Name),
+            "set_table" => !string.IsNullOrEmpty(c.Sheet)
+                && !string.IsNullOrEmpty(c.Range)
+                && IsValidTableName(c.Name)
+                && (string.IsNullOrWhiteSpace(c.DisplayName) || IsValidTableName(c.DisplayName))
+                && (c.HeaderRowCount == null || c.HeaderRowCount == 1)
+                && c.TotalsRowShown != true,
+            "delete_table" => IsValidTableName(c.Name),
             "set_sheet_visibility" => !string.IsNullOrEmpty(c.Name ?? c.Sheet) && IsValidVisibility(c.Visibility),
             "set_defined_name" => !string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(c.RefersTo),
             "add_defined_name" => !string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(c.RefersTo),
@@ -753,6 +760,8 @@ public class SpreadsheetEditor
         "add_sheet" => $"Added sheet \"{c.Name}\"",
         "rename_sheet" => $"Renamed sheet \"{c.From}\" → \"{c.To}\"",
         "delete_sheet" => $"Deleted sheet \"{c.Name}\"",
+        "set_table" => $"Set table \"{c.Name}\" on {c.Sheet}!{c.Range}",
+        "delete_table" => $"Deleted table \"{c.Name}\"",
         "set_sheet_visibility" => $"Set sheet \"{GetSheetTarget(c)}\" visibility to {NormalizeVisibility(c.Visibility!)}",
         "set_defined_name" => $"Set defined name \"{c.Name}\" → {c.RefersTo}" + (string.IsNullOrEmpty(c.ScopeSheet) ? "" : $" (scope: {c.ScopeSheet})"),
         "add_defined_name" => $"Set defined name \"{c.Name}\" → {c.RefersTo}" + (string.IsNullOrEmpty(c.ScopeSheet) ? "" : $" (scope: {c.ScopeSheet})"),
@@ -808,6 +817,12 @@ public class SpreadsheetEditor
                 break;
             case "delete_sheet":
                 DeleteSheet(workbookPart, c.Name!);
+                break;
+            case "set_table":
+                SetTable(workbookPart, c);
+                break;
+            case "delete_table":
+                DeleteTable(workbookPart, c.Name!);
                 break;
             case "set_sheet_visibility":
                 SetSheetVisibility(workbookPart, GetSheetTarget(c), c.Visibility!);
@@ -1121,6 +1136,91 @@ public class SpreadsheetEditor
             var part = workbookPart.GetPartById(relId);
             if (part != null) workbookPart.DeletePart(part);
         }
+    }
+
+    private void SetTable(WorkbookPart workbookPart, Change change)
+    {
+        string sheetName = change.Sheet!;
+        string tableName = NormalizeTableName(change.Name!);
+        string displayName = string.IsNullOrWhiteSpace(change.DisplayName)
+            ? tableName
+            : NormalizeTableName(change.DisplayName!);
+        string normalizedRange = NormalizeTableReference(change.Range!);
+        uint headerRowCount = change.HeaderRowCount ?? 1U;
+        if (headerRowCount != 1U)
+            throw new Exception("Only header_row_count=1 is currently supported for tables");
+        if (change.TotalsRowShown == true)
+            throw new Exception("totals_row_shown is not supported yet for tables");
+
+        var worksheetPart = GetWorksheetPart(workbookPart, sheetName);
+        RemoveConflictingTables(worksheetPart, tableName, normalizedRange);
+        EnsureTableNameAvailable(workbookPart, worksheetPart, tableName, displayName);
+        EnsureTableRangeAvailable(worksheetPart, normalizedRange);
+
+        var headerNames = GetTableColumnNames(workbookPart, worksheetPart, normalizedRange);
+        var tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+        uint tableId = GetNextTableId(workbookPart);
+
+        var table = new Table
+        {
+            Id = tableId,
+            Name = tableName,
+            DisplayName = displayName,
+            Reference = normalizedRange,
+            HeaderRowCount = headerRowCount,
+            TotalsRowShown = change.TotalsRowShown ?? false
+        };
+
+        table.AppendChild(new AutoFilter { Reference = normalizedRange });
+
+        var tableColumns = new TableColumns { Count = (uint)headerNames.Count };
+        for (int i = 0; i < headerNames.Count; i++)
+        {
+            tableColumns.AppendChild(new TableColumn
+            {
+                Id = (uint)(i + 1),
+                Name = headerNames[i]
+            });
+        }
+
+        table.AppendChild(tableColumns);
+        table.AppendChild(new TableStyleInfo
+        {
+            Name = string.IsNullOrWhiteSpace(change.StyleName) ? "TableStyleMedium2" : change.StyleName,
+            ShowFirstColumn = false,
+            ShowLastColumn = false,
+            ShowRowStripes = true,
+            ShowColumnStripes = false
+        });
+
+        tablePart.Table = table;
+        tablePart.Table.Save();
+
+        var tableParts = GetOrCreateTableParts(worksheetPart.Worksheet);
+        tableParts.AppendChild(new TablePart { Id = worksheetPart.GetIdOfPart(tablePart) });
+        tableParts.Count = (uint)tableParts.Elements<TablePart>().Count();
+        worksheetPart.Worksheet.Save();
+    }
+
+    private void DeleteTable(WorkbookPart workbookPart, string tableName)
+    {
+        string normalizedName = NormalizeTableName(tableName);
+
+        foreach (var sheet in workbookPart.Workbook.Sheets?.Elements<Sheet>() ?? Enumerable.Empty<Sheet>())
+        {
+            if (TryGetSheetPart(workbookPart, sheet).WorksheetPart is not WorksheetPart worksheetPart)
+                continue;
+
+            var match = worksheetPart.TableDefinitionParts
+                .FirstOrDefault(part => string.Equals(part.Table?.Name?.Value, normalizedName, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                continue;
+
+            RemoveTableDefinitionPart(worksheetPart, match);
+            return;
+        }
+
+        throw new Exception($"Table '{normalizedName}' not found");
     }
 
     private void SetSheetVisibility(WorkbookPart workbookPart, string sheetName, string visibility)
@@ -1887,6 +1987,131 @@ public class SpreadsheetEditor
 
     // ── Helpers ──
 
+    private static TableParts GetOrCreateTableParts(Worksheet worksheet)
+    {
+        var tableParts = worksheet.GetFirstChild<TableParts>();
+        if (tableParts != null)
+            return tableParts;
+
+        tableParts = new TableParts();
+        var extensionList = worksheet.GetFirstChild<WorksheetExtensionList>();
+        if (extensionList != null)
+            worksheet.InsertBefore(tableParts, extensionList);
+        else
+            worksheet.AppendChild(tableParts);
+
+        return tableParts;
+    }
+
+    private static void RemoveTableDefinitionPart(WorksheetPart worksheetPart, TableDefinitionPart tablePart)
+    {
+        string relationshipId = worksheetPart.GetIdOfPart(tablePart);
+        var tableParts = worksheetPart.Worksheet.GetFirstChild<TableParts>();
+        var tablePartRef = tableParts?.Elements<TablePart>()
+            .FirstOrDefault(part => part.Id?.Value == relationshipId);
+
+        tablePartRef?.Remove();
+        if (tableParts != null)
+        {
+            if (!tableParts.Elements<TablePart>().Any())
+                tableParts.Remove();
+            else
+                tableParts.Count = (uint)tableParts.Elements<TablePart>().Count();
+        }
+
+        worksheetPart.DeletePart(tablePart);
+        worksheetPart.Worksheet.Save();
+    }
+
+    private void EnsureTableNameAvailable(WorkbookPart workbookPart, WorksheetPart targetWorksheetPart, string tableName, string displayName)
+    {
+        foreach (var sheet in workbookPart.Workbook.Sheets?.Elements<Sheet>() ?? Enumerable.Empty<Sheet>())
+        {
+            if (TryGetSheetPart(workbookPart, sheet).WorksheetPart is not WorksheetPart worksheetPart)
+                continue;
+
+            bool sameWorksheet = ReferenceEquals(worksheetPart, targetWorksheetPart);
+            bool nameExists = worksheetPart.TableDefinitionParts.Any(part =>
+                string.Equals(part.Table?.Name?.Value, tableName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(part.Table?.DisplayName?.Value, displayName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(part.Table?.Name?.Value, displayName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(part.Table?.DisplayName?.Value, tableName, StringComparison.OrdinalIgnoreCase));
+
+            if (nameExists && !sameWorksheet)
+                throw new Exception($"Table name or display name '{tableName}'/'{displayName}' already exists on sheet '{sheet.Name?.Value ?? "Unknown"}'");
+        }
+    }
+
+    private static void RemoveConflictingTables(WorksheetPart worksheetPart, string tableName, string normalizedRange)
+    {
+        var conflicts = worksheetPart.TableDefinitionParts
+            .Where(part =>
+                string.Equals(part.Table?.Name?.Value, tableName, StringComparison.Ordinal)
+                || string.Equals(NormalizeOptionalTableReference(part.Table?.Reference?.Value), normalizedRange, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var conflict in conflicts)
+            RemoveTableDefinitionPart(worksheetPart, conflict);
+    }
+
+    private static void EnsureTableRangeAvailable(WorksheetPart worksheetPart, string normalizedRange)
+    {
+        var targetRange = ParseRangeReference(normalizedRange);
+        string? overlappingTable = worksheetPart.TableDefinitionParts
+            .FirstOrDefault(part => RangesOverlap(ParseRangeReference(part.Table?.Reference?.Value ?? ""), targetRange))
+            ?.Table?.Name?.Value;
+
+        if (!string.IsNullOrWhiteSpace(overlappingTable))
+            throw new Exception($"Table '{overlappingTable}' overlaps the target range {normalizedRange}");
+    }
+
+    private static uint GetNextTableId(WorkbookPart workbookPart)
+    {
+        return workbookPart.WorksheetParts
+            .SelectMany(part => part.TableDefinitionParts)
+            .Select(part => part.Table?.Id?.Value ?? 0U)
+            .DefaultIfEmpty(0U)
+            .Max() + 1;
+    }
+
+    private static List<string> GetTableColumnNames(WorkbookPart workbookPart, WorksheetPart worksheetPart, string normalizedRange)
+    {
+        var ((startColumn, startRow), (endColumn, _)) = ParseRangeReference(normalizedRange);
+        int startColumnIndex = ColumnNameToIndex(startColumn);
+        int endColumnIndex = ColumnNameToIndex(endColumn);
+
+        var sheetData = worksheetPart.Worksheet.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.SheetData>()
+            ?? throw new Exception("Worksheet has no sheet data");
+        var headerRow = sheetData.Elements<Row>()
+            .FirstOrDefault(row => row.RowIndex?.Value == startRow)
+            ?? throw new Exception($"Table header row {startRow} not found");
+        var sharedStrings = workbookPart.SharedStringTablePart?.SharedStringTable;
+
+        var names = new List<string>();
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex++)
+        {
+            string cellRef = $"{IndexToColumnName(columnIndex)}{startRow}";
+            var cell = headerRow.Elements<Cell>()
+                .FirstOrDefault(existing => string.Equals(existing.CellReference?.Value, cellRef, StringComparison.OrdinalIgnoreCase));
+            string header = cell != null ? GetCellValue(cell, sharedStrings)?.Trim() ?? "" : "";
+            if (string.IsNullOrWhiteSpace(header))
+                header = $"Column{columnIndex - startColumnIndex + 1}";
+
+            string uniqueHeader = header;
+            int suffix = 2;
+            while (!seenNames.Add(uniqueHeader))
+            {
+                uniqueHeader = $"{header}_{suffix}";
+                suffix++;
+            }
+
+            names.Add(uniqueHeader);
+        }
+
+        return names;
+    }
+
     private static T InsertWorksheetElementAfterPredecessors<T>(
         Worksheet worksheet,
         T element,
@@ -2258,6 +2483,23 @@ public class SpreadsheetEditor
         return normalized.Length == 6 ? $"FF{normalized}" : normalized;
     }
 
+    private static bool IsValidTableName(string? tableName)
+    {
+        if (string.IsNullOrWhiteSpace(tableName))
+            return false;
+
+        return Regex.IsMatch(tableName.Trim(), @"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
+    }
+
+    private static string NormalizeTableName(string tableName)
+    {
+        string normalized = tableName.Trim();
+        if (!IsValidTableName(normalized))
+            throw new Exception("Table names must start with a letter or underscore and contain only letters, digits, or underscores");
+
+        return normalized;
+    }
+
     private static string NormalizePrintArea(string sheetName, string range)
     {
         string trimmed = range.Trim();
@@ -2276,6 +2518,72 @@ public class SpreadsheetEditor
             return "";
 
         return Regex.Replace(range.Trim(), @"\s+", " ");
+    }
+
+    private static string NormalizeOptionalTableReference(string? range)
+    {
+        if (string.IsNullOrWhiteSpace(range))
+            return "";
+
+        return NormalizeTableReference(range);
+    }
+
+    private static string NormalizeTableReference(string range)
+    {
+        var ((startColumn, startRow), (endColumn, endRow)) = ParseRangeReference(range);
+        if (endRow <= startRow)
+            throw new Exception("Table range must include a header row and at least one data row");
+
+        int startColumnIndex = ColumnNameToIndex(startColumn);
+        int endColumnIndex = ColumnNameToIndex(endColumn);
+        if (endColumnIndex < startColumnIndex)
+            throw new Exception("Invalid table range: end column precedes start column");
+
+        return $"{startColumn}{startRow}:{endColumn}{endRow}";
+    }
+
+    private static ((string column, uint row) Start, (string column, uint row) End) ParseRangeReference(string range)
+    {
+        string trimmed = range.Trim();
+        if (trimmed.StartsWith("=", StringComparison.Ordinal))
+            trimmed = trimmed[1..];
+
+        if (trimmed.Contains(','))
+            throw new Exception("Only single-area table ranges are supported");
+
+        int bangIndex = trimmed.LastIndexOf('!');
+        if (bangIndex >= 0)
+            trimmed = trimmed[(bangIndex + 1)..];
+
+        trimmed = trimmed.Replace("$", "", StringComparison.Ordinal);
+        string[] parts = trimmed.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+            throw new Exception($"Invalid range reference: {range}");
+
+        var start = ParseCellReference(parts[0].ToUpperInvariant());
+        var end = ParseCellReference(parts[1].ToUpperInvariant());
+
+        int startColumnIndex = ColumnNameToIndex(start.colName);
+        int endColumnIndex = ColumnNameToIndex(end.colName);
+        if (endColumnIndex < startColumnIndex || end.rowIndex < start.rowIndex)
+            throw new Exception($"Range must be ordered from top-left to bottom-right: {range}");
+
+        return ((start.colName, start.rowIndex), (end.colName, end.rowIndex));
+    }
+
+    private static bool RangesOverlap(
+        ((string column, uint row) Start, (string column, uint row) End) left,
+        ((string column, uint row) Start, (string column, uint row) End) right)
+    {
+        int leftStartColumn = ColumnNameToIndex(left.Start.column);
+        int leftEndColumn = ColumnNameToIndex(left.End.column);
+        int rightStartColumn = ColumnNameToIndex(right.Start.column);
+        int rightEndColumn = ColumnNameToIndex(right.End.column);
+
+        return leftStartColumn <= rightEndColumn
+            && rightStartColumn <= leftEndColumn
+            && left.Start.row <= right.End.row
+            && right.Start.row <= left.End.row;
     }
 
     private static string? ToDisplayHexColor(string? color)

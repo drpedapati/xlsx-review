@@ -1,0 +1,13 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "set_table",
+      "sheet": "Data",
+      "range": "A1:D6",
+      "name": "PatientScores",
+      "display_name": "PatientScores",
+      "style_name": "TableStyleMedium2"
+    }
+  ]
+}

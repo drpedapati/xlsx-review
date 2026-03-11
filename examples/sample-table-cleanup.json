@@ -1,0 +1,9 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "delete_table",
+      "name": "PatientScores"
+    }
+  ]
+}

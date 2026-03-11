@@ -1,0 +1,33 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "set_sheet_visibility",
+      "name": "Summary",
+      "visibility": "hidden"
+    },
+    {
+      "type": "set_defined_name",
+      "name": "ScoreRange",
+      "refers_to": "Data!$C$2:$C$6",
+      "comment": "Primary score range"
+    },
+    {
+      "type": "set_defined_name",
+      "name": "SummaryMetric",
+      "scope_sheet": "Summary",
+      "refers_to": "Summary!$B$3",
+      "hidden": true,
+      "comment": "Summary-scoped metric cell"
+    },
+    {
+      "type": "set_workbook_protection",
+      "lock_structure": true
+    },
+    {
+      "type": "set_sheet_protection",
+      "sheet": "Data",
+      "enabled": true
+    }
+  ]
+}

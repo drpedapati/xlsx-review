@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CORPUS_DIR="${ROOT_DIR}/testdata/public-xlsx-corpus/files"
+WORKBOOK_ROOT="${ROOT_DIR}/testdata/public-xlsx-corpus/files"
 BINARY_PATH="${BINARY:-${ROOT_DIR}/build/xlsx-review}"
 SUITE_PATH="${ROOT_DIR}/testdata/public-xlsx-corpus/suites/read-feature-smoke.tsv"
 
@@ -13,6 +13,7 @@ Usage: ./scripts/run_feature_smoke.sh [options]
 
 Options:
   --binary <path>   Binary to run. Defaults to build/xlsx-review
+  --root <path>     Root directory used to resolve relative workbook paths in the suite
   --suite <path>    TSV file with feature assertions
   -h, --help        Show help
 EOF
@@ -22,6 +23,10 @@ while (($# > 0)); do
   case "$1" in
     --binary)
       BINARY_PATH="$2"
+      shift 2
+      ;;
+    --root)
+      WORKBOOK_ROOT="$2"
       shift 2
       ;;
     --suite)
@@ -50,7 +55,12 @@ if [[ ! -f "${SUITE_PATH}" ]]; then
   exit 1
 fi
 
-python3 - "${BINARY_PATH}" "${CORPUS_DIR}" "${SUITE_PATH}" <<'PY'
+if [[ ! -d "${WORKBOOK_ROOT}" ]]; then
+  echo "Workbook root not found: ${WORKBOOK_ROOT}" >&2
+  exit 1
+fi
+
+python3 - "${BINARY_PATH}" "${WORKBOOK_ROOT}" "${SUITE_PATH}" <<'PY'
 import json
 import subprocess
 import sys

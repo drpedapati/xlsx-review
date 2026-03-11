@@ -441,7 +441,11 @@ JSON Manifest Format:
       { ""type"": ""delete_row"", ""sheet"": ""Sheet1"", ""row"": 10 },
       { ""type"": ""add_sheet"", ""name"": ""Summary"" },
       { ""type"": ""rename_sheet"", ""from"": ""Sheet1"", ""to"": ""Data"" },
-      { ""type"": ""delete_sheet"", ""name"": ""Old Sheet"" }
+      { ""type"": ""delete_sheet"", ""name"": ""Old Sheet"" },
+      { ""type"": ""set_sheet_visibility"", ""name"": ""Summary"", ""visibility"": ""hidden"" },
+      { ""type"": ""set_defined_name"", ""name"": ""ScoreRange"", ""refers_to"": ""Data!$C$2:$C$6"" },
+      { ""type"": ""set_workbook_protection"", ""enabled"": true, ""lock_structure"": true },
+      { ""type"": ""set_sheet_protection"", ""sheet"": ""Data"", ""enabled"": true }
     ],
     ""comments"": [
       { ""sheet"": ""Sheet1"", ""cell"": ""A1"", ""text"": ""Review note"" }

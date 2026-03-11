@@ -75,6 +75,33 @@ public class Change
 
     [JsonPropertyName("to")]
     public string? To { get; set; }
+
+    [JsonPropertyName("visibility")]
+    public string? Visibility { get; set; }
+
+    [JsonPropertyName("scope_sheet")]
+    public string? ScopeSheet { get; set; }
+
+    [JsonPropertyName("refers_to")]
+    public string? RefersTo { get; set; }
+
+    [JsonPropertyName("hidden")]
+    public bool? Hidden { get; set; }
+
+    [JsonPropertyName("comment")]
+    public string? Comment { get; set; }
+
+    [JsonPropertyName("enabled")]
+    public bool? Enabled { get; set; }
+
+    [JsonPropertyName("lock_structure")]
+    public bool? LockStructure { get; set; }
+
+    [JsonPropertyName("lock_windows")]
+    public bool? LockWindows { get; set; }
+
+    [JsonPropertyName("lock_revision")]
+    public bool? LockRevision { get; set; }
 }
 
 /// <summary>

@@ -1,0 +1,28 @@
+{
+  "author": "Dr. Smith",
+  "changes": [
+    {
+      "type": "set_sheet_visibility",
+      "name": "Summary",
+      "visibility": "visible"
+    },
+    {
+      "type": "delete_defined_name",
+      "name": "ScoreRange"
+    },
+    {
+      "type": "delete_defined_name",
+      "name": "SummaryMetric",
+      "scope_sheet": "Summary"
+    },
+    {
+      "type": "set_workbook_protection",
+      "enabled": false
+    },
+    {
+      "type": "set_sheet_protection",
+      "sheet": "Data",
+      "enabled": false
+    }
+  ]
+}

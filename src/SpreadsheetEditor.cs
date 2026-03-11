@@ -556,6 +556,12 @@ public class SpreadsheetEditor
             "add_sheet" => !string.IsNullOrEmpty(c.Name),
             "rename_sheet" => !string.IsNullOrEmpty(c.From) && !string.IsNullOrEmpty(c.To),
             "delete_sheet" => !string.IsNullOrEmpty(c.Name),
+            "set_sheet_visibility" => !string.IsNullOrEmpty(c.Name ?? c.Sheet) && IsValidVisibility(c.Visibility),
+            "set_defined_name" => !string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(c.RefersTo),
+            "add_defined_name" => !string.IsNullOrEmpty(c.Name) && !string.IsNullOrEmpty(c.RefersTo),
+            "delete_defined_name" => !string.IsNullOrEmpty(c.Name),
+            "set_workbook_protection" => c.Enabled != null || c.LockStructure != null || c.LockWindows != null || c.LockRevision != null,
+            "set_sheet_protection" => !string.IsNullOrEmpty(c.Sheet) && c.Enabled != null,
             _ => false
         };
 
@@ -579,6 +585,12 @@ public class SpreadsheetEditor
         "add_sheet" => $"Added sheet \"{c.Name}\"",
         "rename_sheet" => $"Renamed sheet \"{c.From}\" → \"{c.To}\"",
         "delete_sheet" => $"Deleted sheet \"{c.Name}\"",
+        "set_sheet_visibility" => $"Set sheet \"{GetSheetTarget(c)}\" visibility to {NormalizeVisibility(c.Visibility!)}",
+        "set_defined_name" => $"Set defined name \"{c.Name}\" → {c.RefersTo}" + (string.IsNullOrEmpty(c.ScopeSheet) ? "" : $" (scope: {c.ScopeSheet})"),
+        "add_defined_name" => $"Set defined name \"{c.Name}\" → {c.RefersTo}" + (string.IsNullOrEmpty(c.ScopeSheet) ? "" : $" (scope: {c.ScopeSheet})"),
+        "delete_defined_name" => $"Deleted defined name \"{c.Name}\"" + (string.IsNullOrEmpty(c.ScopeSheet) ? "" : $" (scope: {c.ScopeSheet})"),
+        "set_workbook_protection" => DescribeWorkbookProtectionChange(c),
+        "set_sheet_protection" => $"Set sheet protection on {c.Sheet} to {(c.Enabled == true ? "enabled" : "disabled")}",
         _ => $"Unknown change type: {c.Type}"
     };
 
@@ -612,6 +624,22 @@ public class SpreadsheetEditor
                 break;
             case "delete_sheet":
                 DeleteSheet(workbookPart, c.Name!);
+                break;
+            case "set_sheet_visibility":
+                SetSheetVisibility(workbookPart, GetSheetTarget(c), c.Visibility!);
+                break;
+            case "set_defined_name":
+            case "add_defined_name":
+                SetDefinedName(workbookPart, c.Name!, c.RefersTo!, c.ScopeSheet, c.Hidden ?? false, c.Comment);
+                break;
+            case "delete_defined_name":
+                DeleteDefinedName(workbookPart, c.Name!, c.ScopeSheet);
+                break;
+            case "set_workbook_protection":
+                SetWorkbookProtection(workbookPart, c.Enabled, c.LockStructure, c.LockWindows, c.LockRevision);
+                break;
+            case "set_sheet_protection":
+                SetSheetProtection(workbookPart, c.Sheet!, c.Enabled!.Value);
                 break;
             default:
                 throw new Exception($"Unknown change type: {c.Type}");
@@ -863,6 +891,120 @@ public class SpreadsheetEditor
         }
     }
 
+    private void SetSheetVisibility(WorkbookPart workbookPart, string sheetName, string visibility)
+    {
+        var sheet = GetSheetElement(workbookPart, sheetName);
+        string normalized = NormalizeVisibility(visibility);
+
+        sheet.State = normalized switch
+        {
+            "visible" => null,
+            "hidden" => SheetStateValues.Hidden,
+            "veryHidden" => SheetStateValues.VeryHidden,
+            _ => throw new Exception($"Unsupported visibility: {visibility}")
+        };
+    }
+
+    private void SetDefinedName(WorkbookPart workbookPart, string name, string refersTo, string? scopeSheet, bool hidden, string? comment)
+    {
+        var definedNames = workbookPart.Workbook.DefinedNames;
+        if (definedNames == null)
+        {
+            definedNames = new DefinedNames();
+            workbookPart.Workbook.AppendChild(definedNames);
+        }
+
+        uint? localSheetId = scopeSheet != null ? GetSheetIndex(workbookPart, scopeSheet) : null;
+        var definedName = FindDefinedName(definedNames, name, localSheetId);
+
+        if (definedName == null)
+        {
+            definedName = new DefinedName { Name = name };
+            definedNames.AppendChild(definedName);
+        }
+
+        definedName.Name = name;
+        definedName.Text = refersTo;
+        definedName.Hidden = hidden;
+        definedName.Comment = string.IsNullOrWhiteSpace(comment) ? null : comment;
+
+        if (localSheetId.HasValue)
+            definedName.LocalSheetId = localSheetId.Value;
+        else
+            definedName.LocalSheetId = null;
+    }
+
+    private void DeleteDefinedName(WorkbookPart workbookPart, string name, string? scopeSheet)
+    {
+        var definedNames = workbookPart.Workbook.DefinedNames
+            ?? throw new Exception("Workbook has no defined names");
+
+        uint? localSheetId = scopeSheet != null ? GetSheetIndex(workbookPart, scopeSheet) : null;
+        var definedName = FindDefinedName(definedNames, name, localSheetId)
+            ?? throw new Exception($"Defined name '{name}' not found" + (scopeSheet == null ? "" : $" for sheet '{scopeSheet}'"));
+
+        definedName.Remove();
+
+        if (!definedNames.Elements<DefinedName>().Any())
+            definedNames.Remove();
+    }
+
+    private void SetWorkbookProtection(WorkbookPart workbookPart, bool? enabled, bool? lockStructure, bool? lockWindows, bool? lockRevision)
+    {
+        if (enabled == false)
+        {
+            workbookPart.Workbook.WorkbookProtection?.Remove();
+            return;
+        }
+
+        bool anyLockSpecified = lockStructure != null || lockWindows != null || lockRevision != null;
+        bool effectiveLockStructure = lockStructure ?? (enabled == true && !anyLockSpecified);
+        bool effectiveLockWindows = lockWindows ?? false;
+        bool effectiveLockRevision = lockRevision ?? false;
+
+        if (!effectiveLockStructure && !effectiveLockWindows && !effectiveLockRevision)
+        {
+            workbookPart.Workbook.WorkbookProtection?.Remove();
+            return;
+        }
+
+        var protection = workbookPart.Workbook.WorkbookProtection;
+        if (protection == null)
+        {
+            protection = new WorkbookProtection();
+            workbookPart.Workbook.AppendChild(protection);
+        }
+
+        protection.LockStructure = effectiveLockStructure;
+        protection.LockWindows = effectiveLockWindows;
+        protection.LockRevision = effectiveLockRevision;
+    }
+
+    private void SetSheetProtection(WorkbookPart workbookPart, string sheetName, bool enabled)
+    {
+        var worksheetPart = GetWorksheetPart(workbookPart, sheetName);
+        var worksheet = worksheetPart.Worksheet;
+        var protection = worksheet.GetFirstChild<SheetProtection>();
+
+        if (!enabled)
+        {
+            protection?.Remove();
+            return;
+        }
+
+        if (protection == null)
+        {
+            protection = new SheetProtection();
+            var sheetData = worksheet.GetFirstChild<DocumentFormat.OpenXml.Spreadsheet.SheetData>();
+            if (sheetData != null)
+                worksheet.InsertAfter(protection, sheetData);
+            else
+                worksheet.AppendChild(protection);
+        }
+
+        protection.Sheet = true;
+    }
+
     // ── Comments (Legacy Notes) ──
 
     private void ApplyComment(WorkbookPart workbookPart, CommentDef commentDef)
@@ -1088,12 +1230,7 @@ public class SpreadsheetEditor
 
     private WorksheetPart GetWorksheetPart(WorkbookPart workbookPart, string sheetName)
     {
-        var sheets = workbookPart.Workbook.GetFirstChild<Sheets>()
-            ?? throw new Exception("No sheets found in workbook");
-
-        var sheet = sheets.Elements<Sheet>()
-            .FirstOrDefault(s => s.Name?.Value == sheetName)
-            ?? throw new Exception($"Sheet '{sheetName}' not found");
+        var sheet = GetSheetElement(workbookPart, sheetName);
 
         var part = workbookPart.GetPartById(sheet.Id?.Value ?? "");
         if (part is WorksheetPart worksheetPart)
@@ -1107,6 +1244,83 @@ public class SpreadsheetEditor
         };
 
         throw new Exception($"Sheet '{sheetName}' is a {partKind} and cannot be edited");
+    }
+
+    private static Sheet GetSheetElement(WorkbookPart workbookPart, string sheetName)
+    {
+        var sheets = workbookPart.Workbook.GetFirstChild<Sheets>()
+            ?? throw new Exception("No sheets found in workbook");
+
+        return sheets.Elements<Sheet>()
+            .FirstOrDefault(s => s.Name?.Value == sheetName)
+            ?? throw new Exception($"Sheet '{sheetName}' not found");
+    }
+
+    private static string GetSheetTarget(Change change)
+    {
+        return change.Sheet ?? change.Name ?? throw new Exception("Missing sheet target");
+    }
+
+    private static bool IsValidVisibility(string? visibility)
+    {
+        if (visibility == null)
+            return false;
+
+        return visibility == "visible"
+            || visibility == "hidden"
+            || visibility == "veryHidden";
+    }
+
+    private static string NormalizeVisibility(string visibility)
+    {
+        return visibility switch
+        {
+            "visible" => "visible",
+            "hidden" => "hidden",
+            "veryHidden" => "veryHidden",
+            _ => throw new Exception($"Visibility must be one of: visible, hidden, veryHidden")
+        };
+    }
+
+    private static uint GetSheetIndex(WorkbookPart workbookPart, string sheetName)
+    {
+        var sheets = workbookPart.Workbook.GetFirstChild<Sheets>()
+            ?? throw new Exception("No sheets found in workbook");
+
+        var sheetList = sheets.Elements<Sheet>().ToList();
+        for (int i = 0; i < sheetList.Count; i++)
+        {
+            if (sheetList[i].Name?.Value == sheetName)
+                return (uint)i;
+        }
+
+        throw new Exception($"Sheet '{sheetName}' not found");
+    }
+
+    private static DefinedName? FindDefinedName(DefinedNames definedNames, string name, uint? localSheetId)
+    {
+        return definedNames.Elements<DefinedName>()
+            .FirstOrDefault(x =>
+            {
+                if (x.Name?.Value != name)
+                    return false;
+
+                uint? existingLocalSheetId = x.LocalSheetId?.Value;
+                return existingLocalSheetId == localSheetId;
+            });
+    }
+
+    private static string DescribeWorkbookProtectionChange(Change change)
+    {
+        if (change.Enabled == false)
+            return "Disabled workbook protection";
+
+        bool anyLockSpecified = change.LockStructure != null || change.LockWindows != null || change.LockRevision != null;
+        bool lockStructure = change.LockStructure ?? (change.Enabled == true && !anyLockSpecified);
+        bool lockWindows = change.LockWindows ?? false;
+        bool lockRevision = change.LockRevision ?? false;
+
+        return $"Set workbook protection (lockStructure={lockStructure.ToString().ToLowerInvariant()}, lockWindows={lockWindows.ToString().ToLowerInvariant()}, lockRevision={lockRevision.ToString().ToLowerInvariant()})";
     }
 
     private static WorksheetPart? TryGetWorksheetPart(WorkbookPart workbookPart, Sheet sheet)

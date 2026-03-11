@@ -9,6 +9,7 @@
 #   make smoke        # Run bundled example smoke tests
 #   make test         # Run test against sample spreadsheet
 #   make test-create  # Run create-mode smoke test
+#   make test-advanced # Run advanced workbook feature smoke test
 #   make corpus-download  # Download public XLSX regression corpus
 #   make corpus-smoke     # Run a curated read smoke suite from the public corpus
 #   make corpus-check     # Run read checks across the public corpus
@@ -41,7 +42,7 @@ PUBLISH_FLAGS := -c Release \
   -p:PublishSingleFile=true \
   -p:IncludeNativeLibrariesForSelfExtract=true
 
-.PHONY: build build-release install all docker smoke test test-dry test-create corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
+.PHONY: build build-release install all docker smoke test test-dry test-create test-advanced corpus-download corpus-smoke corpus-feature-smoke corpus-check corpus-check-fast clean help
 
 ## build: Build single-file binary for current platform
 build:
@@ -89,7 +90,7 @@ all:
 docker:
 	docker build -t $(BINARY_NAME) .
 
-## smoke: Run bundled read/diff/edit/create smoke tests
+## smoke: Run bundled read/diff/edit/create/advanced smoke tests
 smoke: build-release
 	@echo "Running bundled smoke tests..."
 	@mkdir -p $(BUILD_DIR)
@@ -100,6 +101,7 @@ smoke: build-release
 	@grep -q '"success": true' $(BUILD_DIR)/smoke-edit.json
 	@grep -q '"success": true' $(BUILD_DIR)/smoke-create.json
 	@$(LOCAL_RUNNER) $(BUILD_DIR)/smoke-created.xlsx --read --json > $(BUILD_DIR)/smoke-create-read.json
+	@$(MAKE) --no-print-directory test-advanced
 	@echo "✅ Smoke tests passed"
 	@ls -lh $(BUILD_DIR)/smoke-output.xlsx $(BUILD_DIR)/smoke-created.xlsx
 
@@ -139,6 +141,21 @@ test-create: build-release
 	@grep -q '"success": true' $(BUILD_DIR)/test-create-dry.json
 	@ls -lh $(BUILD_DIR)/test_created.xlsx $(BUILD_DIR)/test_created_from_template.xlsx
 	@echo "✅ Create tests passed"
+
+## test-advanced: Exercise advanced workbook metadata edits and read-back assertions
+test-advanced: build-release
+	@echo "Testing advanced workbook metadata edits..."
+	@$(LOCAL_RUNNER) examples/test_old.xlsx examples/sample-advanced-edits.json -o $(BUILD_DIR)/advanced-output.xlsx --json > $(BUILD_DIR)/test-advanced.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-advanced.json
+	@echo "Testing advanced workbook metadata create..."
+	@$(LOCAL_RUNNER) --create --template examples/test_old.xlsx -o $(BUILD_DIR)/advanced-created.xlsx examples/sample-advanced-edits.json --json > $(BUILD_DIR)/test-advanced-create.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-advanced-create.json
+	@echo "Testing advanced workbook metadata cleanup..."
+	@$(LOCAL_RUNNER) $(BUILD_DIR)/advanced-output.xlsx examples/sample-advanced-cleanup.json -o $(BUILD_DIR)/advanced-reset.xlsx --json > $(BUILD_DIR)/test-advanced-reset.json
+	@grep -q '"success": true' $(BUILD_DIR)/test-advanced-reset.json
+	@./scripts/run_feature_smoke.sh --binary $(LOCAL_RUNNER) --root $(BUILD_DIR) --suite testdata/local-feature-smoke.tsv
+	@ls -lh $(BUILD_DIR)/advanced-output.xlsx $(BUILD_DIR)/advanced-created.xlsx $(BUILD_DIR)/advanced-reset.xlsx
+	@echo "✅ Advanced feature tests passed"
 
 ## corpus-download: Download the public XLSX regression corpus
 corpus-download:
@@ -183,6 +200,7 @@ help:
 	@echo "  make all                          # Cross-compile all platforms"
 	@echo "  make smoke                        # Run bundled example smoke tests"
 	@echo "  make test-create                  # Exercise workbook creation mode"
+	@echo "  make test-advanced                # Exercise advanced workbook metadata edits"
 	@echo "  make corpus-download              # Download public XLSX corpus"
 	@echo "  make corpus-smoke                 # Run the curated corpus smoke suite"
 	@echo "  make corpus-feature-smoke         # Assert workbook/sheet feature metadata"

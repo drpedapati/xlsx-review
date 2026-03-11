@@ -1,0 +1,21 @@
+# path	field	expected
+advanced-output.xlsx	workbook.hidden_sheet_count	=1
+advanced-output.xlsx	sheet:Summary.visibility	=hidden
+advanced-output.xlsx	workbook.defined_name_count	=2
+advanced-output.xlsx	workbook.defined_names.0.name	=ScoreRange
+advanced-output.xlsx	workbook.defined_names.0.refers_to	=Data!$C$2:$C$6
+advanced-output.xlsx	workbook.defined_names.1.name	=SummaryMetric
+advanced-output.xlsx	workbook.defined_names.1.scope_sheet	=Summary
+advanced-output.xlsx	workbook.defined_names.1.hidden	=true
+advanced-output.xlsx	workbook.protected	=true
+advanced-output.xlsx	workbook.workbook_protection.lock_structure	=true
+advanced-output.xlsx	sheet:Data.protected	=true
+advanced-created.xlsx	workbook.hidden_sheet_count	=1
+advanced-created.xlsx	workbook.defined_name_count	=2
+advanced-created.xlsx	workbook.protected	=true
+advanced-created.xlsx	sheet:Data.protected	=true
+advanced-reset.xlsx	workbook.hidden_sheet_count	=0
+advanced-reset.xlsx	workbook.defined_name_count	=0
+advanced-reset.xlsx	workbook.protected	=false
+advanced-reset.xlsx	sheet:Summary.visibility	=visible
+advanced-reset.xlsx	sheet:Data.protected	=false

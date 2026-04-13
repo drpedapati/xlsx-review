@@ -24,6 +24,7 @@ class Program
         bool showHelp = false;
         bool showVersion = false;
         string? templatePath = null;
+        bool noHighlight = false;
         var positionalArgs = new List<string>();
 
         for (int i = 0; i < args.Length; i++)
@@ -64,6 +65,9 @@ class Program
                     break;
                 case "--git-setup":
                     gitSetup = true;
+                    break;
+                case "--no-highlight":
+                    noHighlight = true;
                     break;
                 case "-h":
                 case "--help":
@@ -375,6 +379,10 @@ class Program
 
         // Process
         var spreadsheetEditor = new SpreadsheetEditor(effectiveAuthor);
+        // --create mode defaults to no highlighting (everything is new).
+        // --no-highlight explicitly disables for edit mode too.
+        if (noHighlight || createMode)
+            spreadsheetEditor.HighlightEdits = false;
         ProcessingResult result;
 
         try

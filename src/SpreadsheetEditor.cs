@@ -14,10 +14,21 @@ namespace XlsxReview;
 public class SpreadsheetEditor
 {
     private readonly string _author;
+    private bool _highlightEdits = true;
 
     public SpreadsheetEditor(string author)
     {
         _author = author;
+    }
+
+    /// <summary>
+    /// When false, set_cell and set_formula do not apply yellow highlighting.
+    /// Default is true (review mode). Set to false for create/populate workflows.
+    /// </summary>
+    public bool HighlightEdits
+    {
+        get => _highlightEdits;
+        set => _highlightEdits = value;
     }
 
     // ── Read Mode ──
@@ -918,8 +929,9 @@ public class SpreadsheetEditor
             cell.InlineString = new InlineString(new Text(value));
         }
 
-        // Apply yellow highlight
-        ApplyYellowFill(workbookPart, cell);
+        // Apply yellow highlight (review mode only)
+        if (_highlightEdits)
+            ApplyYellowFill(workbookPart, cell);
     }
 
     private void SetFormula(WorkbookPart workbookPart, string sheetName, string cellRef, string formula)
@@ -936,7 +948,8 @@ public class SpreadsheetEditor
         cell.CellValue = null; // Excel will calculate
         cell.DataType = null;
 
-        ApplyYellowFill(workbookPart, cell);
+        if (_highlightEdits)
+            ApplyYellowFill(workbookPart, cell);
     }
 
     // ── Row Operations ──

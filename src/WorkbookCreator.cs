@@ -52,7 +52,7 @@ public class WorkbookCreator
                         Directory.CreateDirectory(dir);
                 }
 
-                var editor = new SpreadsheetEditor(author);
+                var editor = new SpreadsheetEditor(author) { HighlightEdits = false };
                 var editResult = editor.Process(tempWorkbook, dryRun ? "" : outputPath, manifest, dryRun);
 
                 result.ChangesAttempted = editResult.ChangesAttempted;

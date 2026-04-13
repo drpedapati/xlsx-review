@@ -33,7 +33,9 @@ Create, edit, read, and diff Excel spreadsheets using `xlsx-review`, a CLI tool 
 
 3. **NEVER use `comments` on cells that already have comments from a previous edit pass.** This produces invalid `legacyDrawing` element ordering. The file opens with a repair dialog.
 
-4. **Always validate after creating.** Run `xlsx-review output.xlsx --read --json` and check that the structure matches expectations. For critical files, open in Excel or LibreOffice to verify.
+4. **`--create` mode disables yellow highlighting automatically.** In edit mode, cells are highlighted yellow to show changes. In create mode (v1.3.0+), this is disabled. For edit mode without highlighting, use `--no-highlight`.
+
+5. **Always validate after creating.** Run `xlsx-review output.xlsx --read --json` and check that the structure matches expectations. For critical files, open in Excel or LibreOffice to verify.
 
 ## Workflow
 

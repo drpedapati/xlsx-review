@@ -435,11 +435,18 @@ Diff & Git Integration:
 Read/Write Options:
   --read                 Read mode: extract cell values from all sheets
   -o, --output <path>    Output file path (default: <input>_edited.xlsx for edits)
+  --no-highlight         Disable yellow highlighting on edited cells
   --author <name>        Author name for comments (overrides manifest author)
   --json                 Output results as JSON
   --dry-run              Validate manifest without modifying
   -v, --version          Show version
   -h, --help             Show this help
+
+Important Notes:
+  - --create mode disables cell highlighting automatically (no yellow fills)
+  - Do NOT combine set_table with set_auto_filter (tables include auto-filter)
+  - set_page_orientation and comments have known element ordering issues (#2, #3)
+  - Use ""format"": ""number"" on set_cell for numeric values in formulas
 
 JSON Manifest Format:
   {
